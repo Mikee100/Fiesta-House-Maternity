@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getCustomer, getCustomerMessages, toggleCustomerAi, getCustomerPhotoLinks, getCustomerSessionNotes, updateSessionNote, SessionNote } from '../api/customers';
+import { getCustomer, getCustomerMessages, toggleCustomerAi, getCustomerPhotoLinks, getCustomerSessionNotes, updateSessionNote, getCustomerSentiment, getAverageActivity, SessionNote } from '../api/customers';
 import { getCustomerBookings } from '../api/bookings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   ArrowLeft,
   User,
@@ -23,21 +31,24 @@ import {
   Image as ImageIcon,
   FileText,
   TrendingUp,
-  Users,
-  Package,
   ClipboardList,
   CheckCircle2,
+  Smile,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import SendPhotoLinkCard from '../components/ui/SendPhotoLinkCard';
 import InvoiceCard from '../components/InvoiceCard';
 import { invoicesApi } from '../api/invoices';
-import { fetchActiveUsersStats, fetchEngagedCustomersStats, fetchPackagePopularityStats } from '../api/statistics';
+import { useAuth } from '@/hooks/useAuth';
 
 const CustomerDetailsPage = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
+  const [reviewNotesText, setReviewNotesText] = useState('');
 
   const { data: customer, isLoading: customerLoading, refetch: refetchCustomer } = useQuery({
     queryKey: ['customer', customerId],
@@ -75,20 +86,18 @@ const CustomerDetailsPage = () => {
     enabled: !!customerId,
   });
 
-  // Statistics queries
-  const { data: activeUsersStats } = useQuery({
-    queryKey: ['active-users-stats'],
-    queryFn: fetchActiveUsersStats,
+  // This customer's own sentiment history, and real business-wide averages to
+  // compare their activity against (replacing the old business-wide stats that
+  // were shown here regardless of which customer's page you were on).
+  const { data: sentimentHistory } = useQuery({
+    queryKey: ['customer-sentiment', customerId],
+    queryFn: () => getCustomerSentiment(customerId!),
+    enabled: !!customerId,
   });
 
-  const { data: engagedCustomersStats } = useQuery({
-    queryKey: ['engaged-customers-stats'],
-    queryFn: fetchEngagedCustomersStats,
-  });
-
-  const { data: packagePopularityStats } = useQuery({
-    queryKey: ['package-popularity-stats'],
-    queryFn: fetchPackagePopularityStats,
+  const { data: averageActivity } = useQuery({
+    queryKey: ['average-activity'],
+    queryFn: getAverageActivity,
   });
 
   const handleToggleAi = async () => {
@@ -637,7 +646,7 @@ const CustomerDetailsPage = () => {
                                     try {
                                       await updateSessionNote(note.id, {
                                         status: 'approved',
-                                        reviewedBy: 'admin', // TODO: Get actual admin user ID
+                                        reviewedBy: user?.name || user?.email || 'admin',
                                       });
                                       toast.success('Session note approved');
                                       refetchSessionNotes();
@@ -653,19 +662,9 @@ const CustomerDetailsPage = () => {
                                   size="sm"
                                   variant="outline"
                                   className="h-8 text-xs"
-                                  onClick={async () => {
-                                    const notes = prompt('Add notes (optional):');
-                                    try {
-                                      await updateSessionNote(note.id, {
-                                        status: 'reviewed',
-                                        adminNotes: notes || undefined,
-                                        reviewedBy: 'admin', // TODO: Get actual admin user ID
-                                      });
-                                      toast.success('Session note reviewed');
-                                      refetchSessionNotes();
-                                    } catch (error) {
-                                      toast.error('Failed to update note');
-                                    }
+                                  onClick={() => {
+                                    setReviewingNoteId(note.id);
+                                    setReviewNotesText('');
                                   }}
                                 >
                                   <Clock className="h-3.5 w-3.5 mr-1" />
@@ -694,104 +693,79 @@ const CustomerDetailsPage = () => {
 
             {/* Insights Tab */}
             <TabsContent value="insights" className="mt-4 space-y-4">
-              {/* Engagement Stats */}
+              {/* This customer's own sentiment history - not business-wide stats */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Engagement Analytics
+                    <Smile className="h-4 w-4" />
+                    Customer Sentiment
                   </CardTitle>
+                  <CardDescription className="text-xs">Based on this customer's own messages</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-600" />
-                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300">Active Users</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm">
-                          Daily: <span className="font-semibold">{activeUsersStats?.daily ?? '0'}</span>
-                        </p>
-                        <p className="text-sm">
-                          Weekly: <span className="font-semibold">{activeUsersStats?.weekly ?? '0'}</span>
-                        </p>
-                        <p className="text-sm">
-                          Monthly: <span className="font-semibold">{activeUsersStats?.monthly ?? '0'}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-green-600" />
-                        <p className="text-xs font-medium text-green-700 dark:text-green-300">Top Customers</p>
-                      </div>
-                      {engagedCustomersStats?.slice(0, 2).map((c: any) => (
-                        <div key={c.id} className="text-sm">
-                          <p className="font-medium truncate">{c.name || 'Unknown'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {c._count?.messages ?? 0} messages • {c._count?.bookings ?? 0} bookings
+                  {!sentimentHistory || sentimentHistory.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No sentiment data yet for this customer</p>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Average Score</p>
+                          <p className="text-lg font-semibold">
+                            {(sentimentHistory.reduce((sum, s) => sum + s.score, 0) / sentimentHistory.length).toFixed(2)}
                           </p>
                         </div>
-                      ))}
-                    </div>
-
-                    <div className="space-y-2 p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20">
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-purple-600" />
-                        <p className="text-xs font-medium text-purple-700 dark:text-purple-300">Popular Packages</p>
-                      </div>
-                      {packagePopularityStats?.slice(0, 2).map((pkg: any) => (
-                        <div key={pkg.id} className="text-sm">
-                          <p className="font-medium truncate">{pkg.name}</p>
-                          <p className="text-xs text-muted-foreground">{pkg.bookings} bookings</p>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Readings</p>
+                          <p className="text-lg font-semibold">{sentimentHistory.length}</p>
                         </div>
-                      ))}
+                      </div>
+                      <div className="space-y-1.5 pt-2 border-t">
+                        {sentimentHistory.slice(0, 5).map((s) => (
+                          <div key={s.id} className="flex items-center justify-between text-sm">
+                            <Badge
+                              variant={s.sentiment.includes('negative') ? 'destructive' : s.sentiment.includes('positive') ? 'default' : 'secondary'}
+                              className="text-xs capitalize"
+                            >
+                              {s.sentiment.replace('_', ' ')}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(s.createdAt), { addSuffix: true })}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Customer Comparison */}
+              {/* Real comparison against actual business-wide averages */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Customer Comparison</CardTitle>
-                  <CardDescription className="text-xs">
-                    How this customer compares to others
-                  </CardDescription>
+                  <CardTitle className="text-sm font-medium">Activity vs. Average Customer</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-medium">Message Frequency</p>
-                        <p className="text-xs text-muted-foreground">
-                          {messages?.length || 0} total • {(messages?.length || 0) > 10 ? 'High' : (messages?.length || 0) > 5 ? 'Medium' : 'Low'}
-                        </p>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-1.5">
-                        <div
-                          className="bg-primary h-1.5 rounded-full"
-                          style={{ width: `${Math.min((messages?.length || 0) * 5, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-medium">Booking Rate</p>
-                        <p className="text-xs text-muted-foreground">
-                          {bookings?.length || 0} bookings • {(bookings?.length || 0) > 2 ? 'Frequent' : 'Occasional'}
-                        </p>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-1.5">
-                        <div
-                          className="bg-green-500 h-1.5 rounded-full"
-                          style={{ width: `${Math.min((bookings?.length || 0) * 20, 100)}%` }}
-                        />
-                      </div>
-                    </div>
+                  <div className="space-y-5">
+                    {[
+                      { label: 'Messages', value: messages?.length || 0, avg: averageActivity?.avgMessages || 0, color: 'bg-primary' },
+                      { label: 'Bookings', value: bookings?.length || 0, avg: averageActivity?.avgBookings || 0, color: 'bg-green-500' },
+                    ].map(({ label, value, avg, color }) => {
+                      const max = Math.max(value, avg, 1);
+                      return (
+                        <div key={label}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-xs font-medium">{label}</p>
+                            <p className="text-xs text-muted-foreground">{value} vs avg {avg.toFixed(1)}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="w-full bg-muted rounded-full h-1.5">
+                              <div className={`${color} h-1.5 rounded-full`} style={{ width: `${Math.min((value / max) * 100, 100)}%` }} />
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-1.5">
+                              <div className="bg-muted-foreground/40 h-1.5 rounded-full" style={{ width: `${Math.min((avg / max) * 100, 100)}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -799,6 +773,43 @@ const CustomerDetailsPage = () => {
           </Tabs>
         </div>
       </div>
+
+      {/* Review session note - replaces the old native prompt() */}
+      <Dialog open={reviewingNoteId !== null} onOpenChange={(open) => !open && setReviewingNoteId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Review Session Note</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              placeholder="Add notes (optional)..."
+              value={reviewNotesText}
+              onChange={(e) => setReviewNotesText(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewingNoteId(null)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                if (!reviewingNoteId) return;
+                try {
+                  await updateSessionNote(reviewingNoteId, {
+                    status: 'reviewed',
+                    adminNotes: reviewNotesText || undefined,
+                    reviewedBy: user?.name || user?.email || 'admin',
+                  });
+                  toast.success('Session note reviewed');
+                  refetchSessionNotes();
+                  setReviewingNoteId(null);
+                } catch {
+                  toast.error('Failed to update note');
+                }
+              }}
+            >
+              Save Review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

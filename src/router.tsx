@@ -6,10 +6,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
-import AiPerformanceDashboard from "./pages/AiPerformanceDashboard";
-import AIObservability from "./pages/AIObservability";
-import QueueDashboard from "./pages/QueueDashboard";
-import MpesaTest from "./pages/MpesaTest";
 import Bookings from "./pages/Bookings";
 import Conversations from "./pages/Conversations";
 import Customers from "./pages/Customers";
@@ -19,16 +15,12 @@ import Instagram from "./pages/Instagram";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import Settings from "./pages/Settings";
 import PackagesPage from "./pages/Packages";
-import AIPromptSettings from "./pages/AIPromptSettings";
-import AITestChat from "./pages/AITestChat";
-import AITestPage from "./pages/AITestPage";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { useAuthStore } from "./state/authStore";
 import Escalations from "./pages/Escalations";
 import Notifications from "./pages/Notifications";
 import MessengerPage from "./pages/MessengerPage";
-import HealthMonitoring from "./pages/HealthMonitoring";
 
 const queryClient = new QueryClient();
 
@@ -116,46 +108,6 @@ const AppRouter = () => {
             }
           />
           <Route
-            path="/mpesa-test"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <MpesaTest />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/queue-dashboard"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <QueueDashboard />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-performance"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <AiPerformanceDashboard />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-observability"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <AIObservability />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/packages"
             element={
               <ProtectedRoute>
@@ -186,41 +138,11 @@ const AppRouter = () => {
             }
           />
           <Route
-            path="/ai-test-chat"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <AITestChat />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-test-page"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <AITestPage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/settings"
             element={
               <ProtectedRoute>
                 <Layout>
                   <Settings />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-prompt-settings"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <AIPromptSettings />
                 </Layout>
               </ProtectedRoute>
             }
@@ -241,16 +163,6 @@ const AppRouter = () => {
               <ProtectedRoute>
                 <Layout>
                   <MessengerPage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/health"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <HealthMonitoring />
                 </Layout>
               </ProtectedRoute>
             }

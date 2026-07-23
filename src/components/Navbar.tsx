@@ -18,6 +18,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { API_BASE_URL } from '@/config';
 import { io, Socket } from 'socket.io-client';
+import { toast } from '@/components/ui/sonner';
 
 export function Navbar() {
   const { user, logout } = useAuthStore();
@@ -82,9 +83,17 @@ export function Navbar() {
     });
 
     // Listen for new notifications
-    socketRef.current.on('newNotification', () => {
-      console.log('Navbar: New notification received');
+    socketRef.current.on('newNotification', (notification: { type?: string; title?: string; message?: string }) => {
+      console.log('Navbar: New notification received', notification);
       fetchUnreadCount();
+
+      const title = notification?.title || 'New notification';
+      const description = notification?.message;
+      if (notification?.type === 'escalation') {
+        toast.warning(title, { description });
+      } else {
+        toast(title, { description });
+      }
     });
 
     // Refresh every 30 seconds (fallback)
@@ -132,17 +141,6 @@ export function Navbar() {
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* AI Test Page Link */}
-          <Link to="/ai-test-page">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground hover:bg-accent tap-target transition-all duration-200 rounded-lg"
-            >
-              AI Test
-            </Button>
-          </Link>
-
           {/* Notifications */}
           <Link to="/notifications">
             <Button

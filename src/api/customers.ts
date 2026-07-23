@@ -44,7 +44,7 @@ export const updateCustomer = async (id: string, data: Partial<Customer>): Promi
 };
 
 export const toggleCustomerAi = async (id: string, enabled: boolean): Promise<Customer> => {
-    const response = await api.patch(`/customers/${id}/toggle-ai`, { enabled });
+    const response = await api.post(`/customers/${id}/toggle-ai`, { enabled });
     return response.data;
 };
 
@@ -94,5 +94,28 @@ export const getCustomerSessionNotes = async (customerId: string): Promise<Sessi
 
 export const updateSessionNote = async (noteId: string, data: { status?: string; adminNotes?: string; reviewedBy?: string }): Promise<SessionNote> => {
   const response = await api.patch(`/customers/session-notes/${noteId}`, data);
+  return response.data;
+};
+
+export interface SentimentScoreEntry {
+  id: string;
+  score: number;
+  sentiment: string;
+  confidence: number;
+  createdAt: string;
+}
+
+export const getCustomerSentiment = async (customerId: string): Promise<SentimentScoreEntry[]> => {
+  const response = await api.get(`/customers/${customerId}/sentiment`);
+  return response.data;
+};
+
+export interface AverageActivity {
+  avgMessages: number;
+  avgBookings: number;
+}
+
+export const getAverageActivity = async (): Promise<AverageActivity> => {
+  const response = await api.get('/customers/stats/averages');
   return response.data;
 };
