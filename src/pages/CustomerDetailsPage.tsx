@@ -113,22 +113,6 @@ const CustomerDetailsPage = () => {
     }
   };
 
-  if (customerLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!customer) {
-    return (
-      <div className="p-6 text-red-600 bg-red-50 rounded-lg border border-red-200">
-        Customer not found. Please check the customer ID and try again.
-      </div>
-    );
-  }
-
   const inboundMessages = messages?.filter((m) => m.direction === 'inbound') || [];
   const outboundMessages = messages?.filter((m) => m.direction === 'outbound') || [];
   const lastMessage = messages?.[messages.length - 1];
@@ -194,6 +178,22 @@ const CustomerDetailsPage = () => {
     if (note.type === 'special_request') return `Request: ${detailsText || itemsText || 'No details provided'}`;
     return `Note: ${detailsText || itemsText || 'No details provided'}`;
   };
+
+  if (customerLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!customer) {
+    return (
+      <div className="p-6 text-red-600 bg-red-50 rounded-lg border border-red-200">
+        Customer not found. Please check the customer ID and try again.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
