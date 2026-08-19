@@ -61,3 +61,23 @@ export const fetchWhatsAppKeywordTrends = async () => {
   const res = await axios.get(`${API_BASE}/api/analytics/whatsapp-keyword-trends`);
   return res.data;
 };
+
+export const fetchRecentConversationLearning = async (limit: number = 50) => {
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.floor(limit), 1), 200) : 50;
+  const res = await axios.get(`${API_BASE}/api/analytics/conversation-learning/recent`, {
+    params: { limit: safeLimit },
+  });
+  return res.data;
+};
+
+export const updateConversationLearningQaLabel = async (
+  id: string,
+  qaLabel: 'correct' | 'partially_correct' | 'incorrect' | 'unsafe',
+  note?: string
+) => {
+  const res = await axios.post(`${API_BASE}/api/analytics/conversation-learning/${encodeURIComponent(id)}/qa-label`, {
+    qaLabel,
+    note,
+  });
+  return res.data;
+};

@@ -21,6 +21,7 @@ import { useAuthStore } from "./state/authStore";
 import Escalations from "./pages/Escalations";
 import Notifications from "./pages/Notifications";
 import MessengerPage from "./pages/MessengerPage";
+import SystemStatus from "./pages/SystemStatus";
 
 const queryClient = new QueryClient();
 
@@ -163,6 +164,16 @@ const AppRouter = () => {
               <ProtectedRoute>
                 <Layout>
                   <MessengerPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/system-status"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SystemStatus />
                 </Layout>
               </ProtectedRoute>
             }
