@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getCustomer, getCustomerMessages, toggleCustomerAi, getCustomerPhotoLinks, getCustomerSessionNotes, updateSessionNote, getCustomerSentiment, getAverageActivity, SessionNote } from '../api/customers';
@@ -35,7 +35,7 @@ import {
   CheckCircle2,
   Smile,
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns';
 import { toast } from 'sonner';
 import SendPhotoLinkCard from '../components/ui/SendPhotoLinkCard';
 import InvoiceCard from '../components/InvoiceCard';
@@ -49,6 +49,8 @@ const CustomerDetailsPage = () => {
 
   const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
   const [reviewNotesText, setReviewNotesText] = useState('');
+  const [noteAction, setNoteAction] = useState<'review' | 'approve' | null>(null);
+  const [sessionNoteFilter, setSessionNoteFilter] = useState<'all' | 'pending' | 'approved' | 'reviewed' | 'declined'>('pending');
 
   const { data: customer, isLoading: customerLoading, refetch: refetchCustomer } = useQuery({
     queryKey: ['customer', customerId],
@@ -130,6 +132,68 @@ const CustomerDetailsPage = () => {
   const inboundMessages = messages?.filter((m) => m.direction === 'inbound') || [];
   const outboundMessages = messages?.filter((m) => m.direction === 'outbound') || [];
   const lastMessage = messages?.[messages.length - 1];
+  const pendingSessionNotesCount = sessionNotes?.filter((n) => n.status === 'pending').length || 0;
+
+  const conversationTimeline = useMemo(() => {
+    const list = [...(messages || [])].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    const items: Array<
+      | { kind: 'day'; key: string; label: string }
+      | { kind: 'message'; key: string; message: typeof list[number] }
+    > = [];
+
+    let lastDayKey = '';
+    for (const message of list) {
+      const dt = new Date(message.createdAt);
+      const dayKey = format(dt, 'yyyy-MM-dd');
+
+      if (dayKey !== lastDayKey) {
+        const label = isToday(dt)
+          ? 'Today'
+          : isYesterday(dt)
+            ? 'Yesterday'
+            : format(dt, 'EEEE, MMM d, yyyy');
+        items.push({ kind: 'day', key: `day-${dayKey}`, label });
+        lastDayKey = dayKey;
+      }
+
+      items.push({ kind: 'message', key: message.id, message });
+    }
+
+    return items;
+  }, [messages]);
+
+  const visibleSessionNotes = useMemo(() => {
+    const list = sessionNotes || [];
+    const filtered = sessionNoteFilter === 'all'
+      ? list
+      : list.filter((note) => note.status === sessionNoteFilter);
+
+    return [...filtered].sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [sessionNotes, sessionNoteFilter]);
+
+  const getNoteTypeLabel = (type: SessionNote['type']) => {
+    if (type === 'external_people') return 'External People';
+    if (type === 'external_items') return 'External Items';
+    if (type === 'special_request') return 'Special Request';
+    return 'Other';
+  };
+
+  const getNoteSummary = (note: SessionNote) => {
+    const itemsText = note.items?.length > 0 ? note.items.join(', ') : '';
+    const detailsText = note.description?.trim() || '';
+
+    if (note.type === 'external_people') return `People: ${itemsText || detailsText || 'No details provided'}`;
+    if (note.type === 'external_items') return `Items: ${itemsText || detailsText || 'No details provided'}`;
+    if (note.type === 'special_request') return `Request: ${detailsText || itemsText || 'No details provided'}`;
+    return `Note: ${detailsText || itemsText || 'No details provided'}`;
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -379,23 +443,26 @@ const CustomerDetailsPage = () => {
               <TabsTrigger value="conversation" className="text-xs">
                 <MessageSquare className="h-3.5 w-3.5 mr-2" />
                 Conversation
+                <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{messages?.length || 0}</Badge>
               </TabsTrigger>
               <TabsTrigger value="bookings" className="text-xs">
                 <CalendarCheck className="h-3.5 w-3.5 mr-2" />
                 Bookings
+                <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{bookings?.length || 0}</Badge>
               </TabsTrigger>
               <TabsTrigger value="session-notes" className="text-xs">
                 <ClipboardList className="h-3.5 w-3.5 mr-2" />
                 Session Notes
-                {sessionNotes && sessionNotes.filter(n => n.status === 'pending').length > 0 && (
+                {pendingSessionNotesCount > 0 && (
                   <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">
-                    {sessionNotes.filter(n => n.status === 'pending').length}
+                    {pendingSessionNotesCount}
                   </Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger value="invoices" className="text-xs">
                 <FileText className="h-3.5 w-3.5 mr-2" />
                 Invoices
+                <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{invoices?.length || 0}</Badge>
               </TabsTrigger>
               <TabsTrigger value="insights" className="text-xs">
                 <TrendingUp className="h-3.5 w-3.5 mr-2" />
@@ -414,7 +481,7 @@ const CustomerDetailsPage = () => {
                 </CardHeader>
                 <Separator />
                 <CardContent className="p-0">
-                  <div className="h-[calc(100vh-16rem)] overflow-y-auto p-4 space-y-3">
+                  <div className="h-[62vh] md:h-[calc(100vh-16rem)] overflow-y-auto bg-muted/20 p-4">
                     {messagesLoading ? (
                       <div className="flex items-center justify-center h-full">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -426,40 +493,51 @@ const CustomerDetailsPage = () => {
                         <p className="text-xs mt-1">Start a conversation with the customer</p>
                       </div>
                     ) : (
-                      messages?.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${message.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[85%] rounded-xl p-3 ${message.direction === 'outbound'
-                              ? 'bg-primary text-primary-foreground rounded-br-none'
-                              : 'bg-muted rounded-bl-none'
-                              }`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                            <div className="flex items-center justify-between mt-2">
-                              <p
-                                className={`text-xs ${message.direction === 'outbound'
-                                  ? 'text-primary-foreground/70'
-                                  : 'text-muted-foreground'
-                                  }`}
+                      <div className="space-y-3">
+                        {conversationTimeline.map((item) => {
+                          if (item.kind === 'day') {
+                            return (
+                              <div key={item.key} className="sticky top-0 z-10 flex justify-center py-1">
+                                <span className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                                  {item.label}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          const message = item.message;
+                          const outbound = message.direction === 'outbound';
+
+                          return (
+                            <div key={item.key} className={`flex ${outbound ? 'justify-end' : 'justify-start'}`}>
+                              <div
+                                className={`max-w-[88%] md:max-w-[76%] rounded-2xl p-3 shadow-sm ${
+                                  outbound
+                                    ? 'bg-primary text-primary-foreground rounded-br-md'
+                                    : 'bg-background border border-border rounded-bl-md'
+                                }`}
                               >
-                                {format(new Date(message.createdAt), 'h:mm a')}
-                              </p>
-                              <Badge
-                                variant="outline"
-                                className={`text-xs h-5 ${message.direction === 'outbound'
-                                  ? 'border-primary-foreground/30 text-primary-foreground/70'
-                                  : ''
-                                  }`}
-                              >
-                                {message.direction === 'outbound' ? 'AI' : 'Customer'}
-                              </Badge>
+                                <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                  <p className={`text-[11px] ${outbound ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>
+                                    {format(new Date(message.createdAt), 'h:mm a')}
+                                  </p>
+                                  <Badge
+                                    variant="outline"
+                                    className={`h-5 text-[10px] ${
+                                      outbound
+                                        ? 'border-primary-foreground/30 text-primary-foreground/85'
+                                        : 'border-border text-muted-foreground'
+                                    }`}
+                                  >
+                                    {outbound ? 'Sent' : 'Customer'}
+                                  </Badge>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      ))
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </CardContent>
@@ -534,18 +612,37 @@ const CustomerDetailsPage = () => {
                 </CardHeader>
                 <Separator />
                 <CardContent className="p-4">
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {[
+                      { key: 'pending', label: `Pending (${pendingSessionNotesCount})` },
+                      { key: 'all', label: `All (${sessionNotes?.length || 0})` },
+                      { key: 'approved', label: 'Approved' },
+                      { key: 'reviewed', label: 'Reviewed' },
+                      { key: 'declined', label: 'Declined' },
+                    ].map((item) => (
+                      <Button
+                        key={item.key}
+                        size="sm"
+                        variant={sessionNoteFilter === item.key ? 'default' : 'outline'}
+                        className="h-7 text-xs"
+                        onClick={() => setSessionNoteFilter(item.key as typeof sessionNoteFilter)}
+                      >
+                        {item.label}
+                      </Button>
+                    ))}
+                  </div>
                   {sessionNotesLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                     </div>
-                  ) : sessionNotes?.length === 0 ? (
+                  ) : visibleSessionNotes.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                       <ClipboardList className="h-10 w-10 mb-3 opacity-20" />
-                      <p className="text-sm">No session notes yet</p>
+                      <p className="text-sm">No session notes match this filter</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {sessionNotes?.map((note) => (
+                      {visibleSessionNotes.map((note) => (
                         <div
                           key={note.id}
                           className={`p-4 rounded-lg border ${
@@ -571,21 +668,21 @@ const CustomerDetailsPage = () => {
                                   }
                                   className="text-xs"
                                 >
-                                  {note.type === 'external_people'
-                                    ? 'External People'
-                                    : note.type === 'external_items'
-                                    ? 'External Items'
-                                    : note.type}
+                                  {getNoteTypeLabel(note.type)}
                                 </Badge>
                                 <Badge
                                   variant={
                                     note.status === 'pending'
-                                      ? 'destructive'
+                                      ? 'secondary'
                                       : note.status === 'approved'
                                       ? 'default'
                                       : 'secondary'
                                   }
-                                  className="text-xs"
+                                  className={`text-xs ${
+                                    note.status === 'pending'
+                                      ? 'border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-100'
+                                      : ''
+                                  }`}
                                 >
                                   {note.status}
                                 </Badge>
@@ -598,7 +695,7 @@ const CustomerDetailsPage = () => {
                               
                               <div>
                                 <p className="text-sm font-medium mb-1">
-                                  Bringing: {note.items.join(', ')}
+                                  {getNoteSummary(note)}
                                 </p>
                                 {note.description && (
                                   <p className="text-xs text-muted-foreground mb-2">
@@ -665,6 +762,20 @@ const CustomerDetailsPage = () => {
                                   onClick={() => {
                                     setReviewingNoteId(note.id);
                                     setReviewNotesText('');
+                                    setNoteAction('approve');
+                                  }}
+                                >
+                                  <FileText className="h-3.5 w-3.5 mr-1" />
+                                  Approve + Note
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs"
+                                  onClick={() => {
+                                    setReviewingNoteId(note.id);
+                                    setReviewNotesText('');
+                                    setNoteAction('review');
                                   }}
                                 >
                                   <Clock className="h-3.5 w-3.5 mr-1" />
@@ -775,37 +886,59 @@ const CustomerDetailsPage = () => {
       </div>
 
       {/* Review session note - replaces the old native prompt() */}
-      <Dialog open={reviewingNoteId !== null} onOpenChange={(open) => !open && setReviewingNoteId(null)}>
+      <Dialog
+        open={reviewingNoteId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReviewingNoteId(null);
+            setNoteAction(null);
+            setReviewNotesText('');
+          }
+        }}
+      >
         <DialogContent>
-          <DialogHeader><DialogTitle>Review Session Note</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{noteAction === 'approve' ? 'Approve Session Note' : 'Review Session Note'}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-2">
             <Textarea
-              placeholder="Add notes (optional)..."
+              placeholder={noteAction === 'approve' ? 'Add approval notes (optional)...' : 'Add review notes (optional)...'}
               value={reviewNotesText}
               onChange={(e) => setReviewNotesText(e.target.value)}
               rows={4}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReviewingNoteId(null)}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReviewingNoteId(null);
+                setNoteAction(null);
+                setReviewNotesText('');
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={async () => {
                 if (!reviewingNoteId) return;
                 try {
                   await updateSessionNote(reviewingNoteId, {
-                    status: 'reviewed',
+                    status: noteAction === 'approve' ? 'approved' : 'reviewed',
                     adminNotes: reviewNotesText || undefined,
                     reviewedBy: user?.name || user?.email || 'admin',
                   });
-                  toast.success('Session note reviewed');
+                  toast.success(noteAction === 'approve' ? 'Session note approved' : 'Session note reviewed');
                   refetchSessionNotes();
                   setReviewingNoteId(null);
+                  setNoteAction(null);
+                  setReviewNotesText('');
                 } catch {
                   toast.error('Failed to update note');
                 }
               }}
             >
-              Save Review
+              {noteAction === 'approve' ? 'Approve Note' : 'Save Review'}
             </Button>
           </DialogFooter>
         </DialogContent>

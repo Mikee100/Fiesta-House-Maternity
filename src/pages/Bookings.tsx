@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DataTable, Badge } from '@/components/DataTable';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { getPackageColor } from '@/utils/packageColors';
 import { PageHeader } from '@/components/PageHeader';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { DayContentProps } from 'react-day-picker';
 
 interface Booking {
   id: string;
@@ -562,6 +563,35 @@ export default function Bookings() {
     ? bookings.filter(b => b.date.toDateString() === selectedDate.toDateString())
     : [];
 
+  const bookingDateKeys = useMemo(() => {
+    const keys = new Set<string>();
+    bookings
+      .filter((b) => b.status !== 'cancelled')
+      .forEach((b) => {
+        const d = b.date;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        keys.add(key);
+      });
+    return keys;
+  }, [bookings]);
+
+  const renderBookingDayContent = ({ date }: DayContentProps) => {
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const hasBookings = bookingDateKeys.has(key);
+
+    return (
+      <div className="relative h-full w-full flex items-center justify-center">
+        <span>{date.getDate()}</span>
+        {hasBookings && (
+          <span
+            className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-primary"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+    );
+  };
+
   const columns = [
     {
       header: 'Customer',
@@ -765,7 +795,7 @@ export default function Bookings() {
             <CardTitle className="text-base font-medium">Calendar</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
-            <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border" />
+            <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border" dayContent={renderBookingDayContent} />
             <div className="w-full space-y-2">
               <p className="text-sm font-medium text-foreground">
                 {selectedDate ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Select a date'}
