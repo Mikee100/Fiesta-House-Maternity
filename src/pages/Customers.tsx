@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getCustomers, Customer } from '../api/customers';
+import { getCustomers, getCustomerActivitySummary, Customer } from '../api/customers';
 import { useNavigate } from 'react-router-dom';
 import {
   Table,
@@ -14,14 +14,22 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Phone, Mail, Calendar, ChevronRight, X, Users } from 'lucide-react';
-import { format } from 'date-fns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Search, ChevronRight, X, Users } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/PageHeader';
 
 type PlatformType = 'all' | 'whatsapp' | 'messenger' | 'instagram' | 'other';
+type ActivitySegment = 'all' | 'online' | 'today' | 'yesterday';
 
 const platformMap: Record<string, { label: string; color: string }> = {
   whatsapp: { label: 'WhatsApp', color: 'text-green-600 bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-900/50' },
@@ -35,10 +43,16 @@ const Customers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState<PlatformType>('all');
   const [aiFilter, setAiFilter] = useState<'all' | 'active' | 'paused'>('all');
+  const [segment, setSegment] = useState<ActivitySegment>('online');
 
   const { data: customers, isLoading, error } = useQuery({
-    queryKey: ['customers'],
-    queryFn: getCustomers,
+    queryKey: ['customers', segment],
+    queryFn: () => getCustomers({ segment }),
+  });
+
+  const { data: activitySummary } = useQuery({
+    queryKey: ['customers-activity-summary'],
+    queryFn: getCustomerActivitySummary,
   });
 
   const normalizePlatform = (customer: Customer) => {
@@ -76,7 +90,21 @@ const Customers = () => {
     setSearchTerm('');
     setPlatformFilter('all');
     setAiFilter('all');
+    setSegment('online');
   };
+
+  const getLastSeenText = (customer: Customer) => {
+    const value = customer.lastActivityAt || customer.updatedAt;
+    if (!value) return 'Unknown';
+    return formatDistanceToNow(new Date(value), { addSuffix: true });
+  };
+
+  const segmentButtons: Array<{ key: ActivitySegment; label: string; count?: number }> = [
+    { key: 'online', label: 'Online', count: activitySummary?.onlineNow },
+    { key: 'today', label: 'Today', count: activitySummary?.activeToday },
+    { key: 'yesterday', label: 'Yesterday', count: activitySummary?.activeYesterday },
+    { key: 'all', label: 'All', count: activitySummary?.totalCustomers },
+  ];
 
   if (error) {
     return (
@@ -94,17 +122,40 @@ const Customers = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-4">
       <PageHeader title="Customers" description="Manage and communicate with your customer base" />
+
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+        <Card className="border-border/50"><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Online Now</p><p className="text-xl font-semibold">{activitySummary?.onlineNow ?? 0}</p></CardContent></Card>
+        <Card className="border-border/50"><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Active Today</p><p className="text-xl font-semibold">{activitySummary?.activeToday ?? 0}</p></CardContent></Card>
+        <Card className="border-border/50"><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Yesterday</p><p className="text-xl font-semibold">{activitySummary?.activeYesterday ?? 0}</p></CardContent></Card>
+        <Card className="border-border/50"><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">New Today</p><p className="text-xl font-semibold">{activitySummary?.newToday ?? 0}</p></CardContent></Card>
+        <Card className="border-border/50"><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">AI Paused</p><p className="text-xl font-semibold">{activitySummary?.pausedAi ?? 0}</p></CardContent></Card>
+        <Card className="border-border/50"><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total</p><p className="text-xl font-semibold">{activitySummary?.totalCustomers ?? 0}</p></CardContent></Card>
+      </div>
 
       {/* Filters */}
       <Card className="border-border/50">
-        <CardContent className="p-4 space-y-3">
-          <div className="relative">
+        <CardContent className="p-3">
+          <div className="flex flex-wrap gap-2 mb-2">
+            {segmentButtons.map((s) => (
+              <Button
+                key={s.key}
+                size="sm"
+                variant={segment === s.key ? 'default' : 'outline'}
+                className="h-8"
+                onClick={() => setSegment(s.key)}
+              >
+                {s.label} {typeof s.count === 'number' ? `(${s.count})` : ''}
+              </Button>
+            ))}
+          </div>
+          <div className="flex flex-col md:flex-row gap-2 md:items-center">
+            <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search customers by name, phone, or email..."
-              className="pl-9 pr-9"
+              className="pl-9 pr-9 h-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -113,47 +164,34 @@ const Customers = () => {
                 <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
               </button>
             )}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground mr-1">Platform:</span>
-                {(['all', 'whatsapp', 'messenger', 'instagram', 'other'] as PlatformType[]).map((platform) => (
-                  <button
-                    key={platform}
-                    onClick={() => setPlatformFilter(platform)}
-                    className={cn(
-                      'px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
-                      platformFilter === platform
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background text-foreground border-border hover:bg-muted'
-                    )}
-                  >
-                    {platform === 'all' ? 'All' : platformMap[platform].label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-1.5 ml-2">
-                <span className="text-xs font-medium text-muted-foreground mr-1">AI Status:</span>
-                {(['all', 'active', 'paused'] as const).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setAiFilter(status)}
-                    className={cn(
-                      'px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
-                      aiFilter === status
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background text-foreground border-border hover:bg-muted'
-                    )}
-                  >
-                    {status === 'all' ? 'All' : status === 'active' ? 'Active' : 'Paused'}
-                  </button>
-                ))}
-              </div>
             </div>
+
+            <Select value={platformFilter} onValueChange={(v) => setPlatformFilter(v as PlatformType)}>
+              <SelectTrigger className="h-9 w-full md:w-[140px]">
+                <SelectValue placeholder="Platform" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Platforms</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="messenger">Messenger</SelectItem>
+                <SelectItem value="instagram">Instagram</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={aiFilter} onValueChange={(v) => setAiFilter(v as 'all' | 'active' | 'paused')}>
+              <SelectTrigger className="h-9 w-full md:w-[130px]">
+                <SelectValue placeholder="AI Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All AI</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="paused">Paused</SelectItem>
+              </SelectContent>
+            </Select>
+
             {(searchTerm || platformFilter !== 'all' || aiFilter !== 'all') && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs h-9 md:ml-auto">
                 <X className="h-3 w-3 mr-1" /> Clear filters
               </Button>
             )}
@@ -192,7 +230,7 @@ const Customers = () => {
                   <TableHead>Customer</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Platform</TableHead>
-                  <TableHead>Joined</TableHead>
+                  <TableHead>Last Active</TableHead>
                   <TableHead>AI Status</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
@@ -203,29 +241,31 @@ const Customers = () => {
                   return (
                     <TableRow
                       key={customer.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer hover:bg-muted/50 h-14"
                       onClick={() => navigate(`/customers/${customer.id}`)}
                     >
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="h-7 w-7">
                             <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">{getInitials(customer.name)}</AvatarFallback>
                           </Avatar>
                           <span className="text-sm font-medium text-foreground">{customer.name || 'Unknown Customer'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-0.5">
-                          {customer.phone && <div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{customer.phone}</div>}
-                          {customer.email && <div className="flex items-center gap-1.5 text-sm text-muted-foreground truncate max-w-[180px]"><Mail className="h-3 w-3" />{customer.email}</div>}
+                        <div className="space-y-0.5 text-sm text-muted-foreground leading-tight">
+                          {customer.phone && <div>{customer.phone}</div>}
+                          {customer.email && <div className="truncate max-w-[220px]">{customer.email}</div>}
+                          {customer.lastMessagePreview && <div className="truncate max-w-[220px] text-xs">{customer.lastMessagePreview}</div>}
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={cn('text-xs', platformMap[platform].color)}>{platformMap[platform].label}</Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5" />{format(new Date(customer.createdAt), 'MMM d, yyyy')}
+                      <TableCell className="text-sm text-muted-foreground">
+                        <div className="leading-tight">
+                          <div>{getLastSeenText(customer)}</div>
+                          <div className="text-xs">{format(new Date(customer.lastActivityAt || customer.updatedAt), 'MMM d, h:mm a')}</div>
                         </div>
                       </TableCell>
                       <TableCell>
