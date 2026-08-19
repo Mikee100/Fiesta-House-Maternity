@@ -138,6 +138,7 @@ export default function Bookings() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerHistory, setCustomerHistory] = useState<any>(null);
   const [loadingCustomerHistory, setLoadingCustomerHistory] = useState(false);
+  const [showCalendarPanel, setShowCalendarPanel] = useState(false);
 
   const getPackageById = (id: string) => packages.find(pkg => pkg.id === id);
 
@@ -725,6 +726,10 @@ export default function Bookings() {
         description="Manage appointments and schedules"
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowCalendarPanel(v => !v)}>
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              {showCalendarPanel ? 'Hide Calendar' : 'Show Calendar'}
+            </Button>
             <Button variant="outline" size="sm" onClick={handleSyncCalendar} disabled={syncing}>
               <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync Calendar'}
@@ -738,22 +743,16 @@ export default function Bookings() {
         }
       />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Bookings', value: statistics.total },
-          { label: 'Confirmed', value: statistics.confirmed },
-          { label: 'Provisional', value: statistics.provisional },
-          { label: 'Revenue', value: `KSh ${statistics.revenue.toLocaleString()}` },
-        ].map(({ label, value }) => (
-          <Card key={label} className="border-border/50">
-            <CardContent className="p-4">
-              <p className="text-xs font-medium text-muted-foreground">{label}</p>
-              <p className="text-2xl font-semibold text-foreground mt-1">{value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card className="border-border/50">
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <span><span className="text-muted-foreground">Total:</span> <span className="font-semibold">{statistics.total}</span></span>
+            <span><span className="text-muted-foreground">Confirmed:</span> <span className="font-semibold">{statistics.confirmed}</span></span>
+            <span><span className="text-muted-foreground">Provisional:</span> <span className="font-semibold">{statistics.provisional}</span></span>
+            <span><span className="text-muted-foreground">Revenue:</span> <span className="font-semibold">KSh {statistics.revenue.toLocaleString()}</span></span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card className="border-border/50">
@@ -788,40 +787,41 @@ export default function Bookings() {
         </CardContent>
       </Card>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Calendar - click a date to see that day's bookings below */}
-        <Card className="border-border/50 lg:col-span-1">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">Calendar</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border" dayContent={renderBookingDayContent} />
-            <div className="w-full space-y-2">
-              <p className="text-sm font-medium text-foreground">
-                {selectedDate ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Select a date'}
-              </p>
-              {bookingsForSelectedDate.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">No bookings for this date</p>
-              ) : (
-                <div className="space-y-2 max-h-[240px] overflow-y-auto">
-                  {bookingsForSelectedDate.map(booking => (
-                    <div key={booking.id} className="flex items-center gap-2 p-2 rounded-md border border-border/50 text-sm">
-                      <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: getPackageColor(booking.service) }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{booking.customerName}</p>
-                        <p className="text-xs text-muted-foreground">{booking.time} - {booking.service}</p>
+      <div className={`grid gap-6 ${showCalendarPanel ? 'lg:grid-cols-3' : 'grid-cols-1'}`}>
+        {showCalendarPanel && (
+          <Card className="border-border/50 lg:col-span-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium">Calendar</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4">
+              <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border" dayContent={renderBookingDayContent} />
+              <div className="w-full space-y-2">
+                <p className="text-sm font-medium text-foreground">
+                  {selectedDate ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Select a date'}
+                </p>
+                {bookingsForSelectedDate.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No bookings for this date</p>
+                ) : (
+                  <div className="space-y-2 max-h-[240px] overflow-y-auto">
+                    {bookingsForSelectedDate.map(booking => (
+                      <div key={booking.id} className="flex items-center gap-2 p-2 rounded-md border border-border/50 text-sm">
+                        <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: getPackageColor(booking.service) }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{booking.customerName}</p>
+                          <p className="text-xs text-muted-foreground">{booking.time} - {booking.service}</p>
+                        </div>
+                        <Badge variant={getStatusVariant(booking.status)} className="capitalize text-[10px]">{booking.status}</Badge>
                       </div>
-                      <Badge variant={getStatusVariant(booking.status)} className="capitalize text-[10px]">{booking.status}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Table */}
-        <Card className="border-border/50 lg:col-span-2 overflow-hidden">
+        <Card className={`border-border/50 overflow-hidden ${showCalendarPanel ? 'lg:col-span-2' : 'col-span-1'}`}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center justify-between">
               All Bookings

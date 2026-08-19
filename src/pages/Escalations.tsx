@@ -42,6 +42,7 @@ export default function Escalations() {
             if (!res.ok) throw new Error('Failed to fetch escalations');
             const data = await res.json();
             setEscalations(data);
+            setError('');
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -98,6 +99,14 @@ export default function Escalations() {
                 return [escalation, ...prev];
             });
             showBrowserNotification(escalation);
+        });
+
+        // Backward-compatible path: server may emit generic admin notifications.
+        // When an escalation notification arrives, refresh the list.
+        socketRef.current.on('newNotification', (notification: any) => {
+            if (notification?.type === 'escalation') {
+                fetchEscalations();
+            }
         });
 
         // Listen for escalation resolved

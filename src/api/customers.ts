@@ -8,6 +8,10 @@ export interface Customer {
     platform: string;
     createdAt: string;
     updatedAt: string;
+    lastActivityAt?: string;
+    lastMessagePreview?: string | null;
+    lastMessageDirection?: 'inbound' | 'outbound' | null;
+    lastMessagePlatform?: string | null;
     aiEnabled: boolean;
     notes?: string;
     // Add other fields as needed based on backend response
@@ -23,9 +27,23 @@ export interface Message {
     customerId: string;
 }
 
-export const getCustomers = async (): Promise<Customer[]> => {
-    const response = await api.get('/customers');
+export const getCustomers = async (params?: { segment?: 'all' | 'online' | 'today' | 'yesterday' }): Promise<Customer[]> => {
+    const response = await api.get('/customers', { params });
     return response.data;
+};
+
+export interface CustomerActivitySummary {
+  onlineNow: number;
+  activeToday: number;
+  activeYesterday: number;
+  newToday: number;
+  pausedAi: number;
+  totalCustomers: number;
+}
+
+export const getCustomerActivitySummary = async (): Promise<CustomerActivitySummary> => {
+  const response = await api.get('/customers/stats/activity-summary');
+  return response.data;
 };
 
 export const getCustomer = async (id: string): Promise<Customer> => {

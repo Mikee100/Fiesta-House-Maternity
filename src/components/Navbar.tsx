@@ -135,7 +135,7 @@ export function Navbar() {
             </Button>
           )}
           <h2 className="text-base sm:text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate max-w-[200px] sm:max-w-none">
-            Business Automation
+            Fiesta House
           </h2>
         </div>
 

@@ -37,19 +37,20 @@ export function Sidebar() {
   const { sidebarCollapsed, mobileMenuOpen, toggleSidebar, setMobileMenuOpen, setSidebarCollapsed } = useUIStore();
   const isDesktop = useIsDesktop();
 
-  // Auto-collapse sidebar on mobile, expand on desktop
+  // Keep desktop collapse state persistent; only enforce mobile behavior.
   useEffect(() => {
     if (isDesktop) {
-      setSidebarCollapsed(false);
       setMobileMenuOpen(false);
     } else {
       setSidebarCollapsed(true);
     }
   }, [isDesktop, setSidebarCollapsed, setMobileMenuOpen]);
 
-  // Close mobile menu when clicking a link
+  // After a navigation selection, auto-collapse on desktop to save space.
   const handleLinkClick = () => {
-    if (!isDesktop) {
+    if (isDesktop) {
+      setSidebarCollapsed(true);
+    } else {
       setMobileMenuOpen(false);
     }
   };
@@ -72,7 +73,7 @@ export function Sidebar() {
         className={cn(
           'fixed left-0 top-0 h-screen bg-card/95 backdrop-blur-xl border-r border-border/50 transition-all duration-300 z-40 shadow-lg',
           // Desktop behavior
-          isDesktop && (sidebarCollapsed ? 'w-16' : 'w-64'),
+          isDesktop && (sidebarCollapsed ? 'w-[4.5rem]' : 'w-56'),
           // Mobile behavior
           !isDesktop && 'w-64',
           !isDesktop && (showSidebar ? 'translate-x-0' : '-translate-x-full'),
@@ -84,14 +85,14 @@ export function Sidebar() {
         <div className="flex h-16 items-center justify-between border-b border-border/50 px-4 bg-card/50 backdrop-blur-sm">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-3 animate-fadeIn">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
-                <LayoutDashboard className="h-5 w-5 text-white" />
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+                <LayoutDashboard className="h-4 w-4 text-white" />
               </div>
               <div>
                 <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
                   Admin Panel
                 </h1>
-                <p className="text-[10px] text-muted-foreground">Business Automation</p>
+               
               </div>
             </div>
           )}
@@ -142,8 +143,8 @@ export function Sidebar() {
               activeClassName="bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 text-primary font-semibold shadow-md shadow-primary/10 border-l-4 border-primary"
             >
               <item.icon className={cn(
-                "h-5 w-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3",
-                sidebarCollapsed && isDesktop && "h-6 w-6"
+                "h-4 w-4 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3",
+                sidebarCollapsed && isDesktop && "h-4 w-4"
               )} />
               {!sidebarCollapsed && (
                 <span className="animate-fadeIn transition-all">{item.name}</span>

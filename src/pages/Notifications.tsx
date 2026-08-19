@@ -25,6 +25,16 @@ interface NotificationsData {
     unreadCount: number;
 }
 
+const normalizeNotificationsData = (payload: any): NotificationsData => {
+    const notifications = Array.isArray(payload?.notifications) ? payload.notifications : [];
+    const total = typeof payload?.total === 'number' ? payload.total : notifications.length;
+    const unreadCount = typeof payload?.unreadCount === 'number'
+        ? payload.unreadCount
+        : notifications.filter((n: any) => n && n.read === false).length;
+
+    return { notifications, total, unreadCount };
+};
+
 export default function Notifications() {
     const [data, setData] = useState<NotificationsData>( { notifications: [], total: 0, unreadCount: 0 });
     const [search, setSearch] = useState('');
@@ -52,7 +62,11 @@ export default function Notifications() {
 
             const baseUrl = API_BASE_URL;
             const response = await fetch(`${baseUrl}/api/notifications?${params}`);
-            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = normalizeNotificationsData(await response.json());
             if (reset) {
                 setData(result);
             } else {
@@ -64,6 +78,10 @@ export default function Notifications() {
             setHasMore(result.notifications.length === 20);
         } catch (error) {
             console.error('Failed to fetch notifications:', error);
+            if (reset) {
+                setData({ notifications: [], total: 0, unreadCount: 0 });
+            }
+            setHasMore(false);
         } finally {
             setLoading(false);
         }

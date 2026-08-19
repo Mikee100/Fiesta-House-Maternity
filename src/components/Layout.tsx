@@ -23,7 +23,7 @@ export function Layout({ children }: LayoutProps) {
       <Sidebar />
       <div className={cn(
         "flex-1 flex flex-col transition-all duration-300 ease-in-out",
-        isDesktop && (sidebarCollapsed ? "ml-16" : "ml-64"),
+        isDesktop && (sidebarCollapsed ? "ml-[4.5rem]" : "ml-56"),
         !isDesktop && "ml-0"
       )}>
         <Navbar />
