@@ -26,6 +26,8 @@ export function Navbar() {
   const isDesktop = useIsDesktop();
   const [unreadCount, setUnreadCount] = useState(0);
   const socketRef = useRef<Socket | null>(null);
+  const isSocketConnectedRef = useRef(false);
+  const fetchUnreadCountRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     // Fetch unread count
@@ -46,6 +48,8 @@ export function Navbar() {
       }
     };
 
+    fetchUnreadCountRef.current = fetchUnreadCount;
+
     fetchUnreadCount();
 
     // Initialize WebSocket connection for real-time notification updates
@@ -58,12 +62,15 @@ export function Navbar() {
 
     socketRef.current.on('connect', () => {
       console.log('Navbar: Connected to WebSocket');
+      isSocketConnectedRef.current = true;
       // Join the admin room to receive notification events
       socketRef.current?.emit('join', { platform: 'admin' });
+      void fetchUnreadCountRef.current();
     });
 
     socketRef.current.on('disconnect', () => {
       console.log('Navbar: Disconnected from WebSocket');
+      isSocketConnectedRef.current = false;
     });
 
     socketRef.current.on('connect_error', (error) => {
@@ -77,15 +84,19 @@ export function Navbar() {
     });
 
     // Listen for notification count updates
-    socketRef.current.on('notificationCountUpdate', () => {
+    socketRef.current.on('notificationCountUpdate', (payload?: { count?: number }) => {
       console.log('Navbar: Notification count update received');
-      fetchUnreadCount();
+      if (typeof payload?.count === 'number') {
+        setUnreadCount(payload.count);
+      } else {
+        void fetchUnreadCountRef.current();
+      }
     });
 
     // Listen for new notifications
     socketRef.current.on('newNotification', (notification: { type?: string; title?: string; message?: string }) => {
       console.log('Navbar: New notification received', notification);
-      fetchUnreadCount();
+      setUnreadCount((prev) => prev + 1);
 
       const title = notification?.title || 'New notification';
       const description = notification?.message;
@@ -96,11 +107,24 @@ export function Navbar() {
       }
     });
 
-    // Refresh every 30 seconds (fallback)
-    const interval = setInterval(fetchUnreadCount, 30000);
+    // Fallback polling only when websocket is down and tab is visible.
+    const interval = setInterval(() => {
+      if (!isSocketConnectedRef.current && document.visibilityState === 'visible') {
+        void fetchUnreadCountRef.current();
+      }
+    }, 120000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !isSocketConnectedRef.current) {
+        void fetchUnreadCountRef.current();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
     
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
