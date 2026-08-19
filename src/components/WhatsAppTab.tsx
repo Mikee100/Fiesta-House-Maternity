@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   fetchTotalWhatsAppCustomers,
   fetchTotalInboundWhatsAppMessages,
@@ -12,6 +12,8 @@ import {
   fetchWhatsAppMostExtremeMessages,
   fetchWhatsAppKeywordTrends,
   fetchWhatsAppAgentAIPerformance,
+  fetchRecentConversationLearning,
+  updateConversationLearningQaLabel,
 } from '@/api/analytics';
 import {
   BarChart,
@@ -43,6 +45,36 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+
+type ConversationLearningRow = {
+  id: string;
+  createdAt: string;
+  extractedIntent: string;
+  detectedEmotionalTone?: string | null;
+  wasSuccessful: boolean;
+  conversationOutcome?: string | null;
+  userMessage: string;
+  aiResponse: string;
+  metadata?: {
+    isFallback?: boolean;
+    platform?: string;
+    intentConfidence?: number;
+    toneConfidence?: number;
+    intentRule?: string;
+    likelyIncorrect?: boolean;
+    likelyIncorrectScore?: number;
+    likelyIncorrectReasons?: string[];
+    qaLabel?: 'correct' | 'partially_correct' | 'incorrect' | 'unsafe';
+    qaReviewedAt?: string;
+    qaNote?: string | null;
+  } | null;
+  customer?: { id: string; name: string } | null;
+};
+
+type ConversationLearningResponse = {
+  items: ConversationLearningRow[];
+  source?: 'conversation_learning' | 'derived_from_messages';
+};
 
 const COLORS = {
   primary: '#3b82f6',
@@ -80,6 +112,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const WhatsAppTab = () => {
+  const LOW_CONFIDENCE_THRESHOLD = 0.6;
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalCustomers: 0,
@@ -95,6 +128,123 @@ const WhatsAppTab = () => {
   const [extremeMessages, setExtremeMessages] = useState<{ mostPositive: any[]; mostNegative: any[] }>({ mostPositive: [], mostNegative: [] });
   const [keywordTrends, setKeywordTrends] = useState<any[]>([]);
   const [agentAIPerformance, setAgentAIPerformance] = useState<any>(null);
+  const [learningRows, setLearningRows] = useState<ConversationLearningRow[]>([]);
+  const [learningSource, setLearningSource] = useState<'conversation_learning' | 'derived_from_messages' | null>(null);
+  const [showLowConfidenceOnly, setShowLowConfidenceOnly] = useState(false);
+  const [showLikelyIncorrectOnly, setShowLikelyIncorrectOnly] = useState(false);
+  const [qaUpdating, setQaUpdating] = useState<Record<string, boolean>>({});
+
+  const confidenceLabel = (v?: number) => {
+    if (typeof v !== 'number') return 'n/a';
+    if (v >= 0.85) return 'high';
+    if (v >= 0.6) return 'med';
+    return 'low';
+  };
+
+  const topLearningRows = useMemo(() => learningRows.slice(0, 20), [learningRows]);
+  const lowConfidenceCount = useMemo(
+    () => topLearningRows.filter((row) => typeof row.metadata?.intentConfidence === 'number' && row.metadata.intentConfidence < LOW_CONFIDENCE_THRESHOLD).length,
+    [topLearningRows]
+  );
+  const likelyIncorrectCount = useMemo(
+    () => topLearningRows.filter((row) => row.metadata?.likelyIncorrect === true || ((row.metadata?.likelyIncorrectScore || 0) >= 0.6)).length,
+    [topLearningRows]
+  );
+  const visibleLearningRows = useMemo(() => {
+    return topLearningRows.filter((row) => {
+      const isLowConfidence = typeof row.metadata?.intentConfidence === 'number' && row.metadata.intentConfidence < LOW_CONFIDENCE_THRESHOLD;
+      const isLikelyIncorrect = row.metadata?.likelyIncorrect === true || ((row.metadata?.likelyIncorrectScore || 0) >= 0.6);
+
+      if (showLowConfidenceOnly && !isLowConfidence) return false;
+      if (showLikelyIncorrectOnly && !isLikelyIncorrect) return false;
+      return true;
+    });
+  }, [showLowConfidenceOnly, showLikelyIncorrectOnly, topLearningRows]);
+
+  const riskLabel = (score?: number) => {
+    if (typeof score !== 'number') return 'n/a';
+    if (score >= 0.8) return 'high';
+    if (score >= 0.6) return 'med';
+    return 'low';
+  };
+
+  const setQaLabel = async (rowId: string, qaLabel: 'correct' | 'partially_correct' | 'incorrect' | 'unsafe') => {
+    try {
+      setQaUpdating((prev) => ({ ...prev, [rowId]: true }));
+      await updateConversationLearningQaLabel(rowId, qaLabel);
+      setLearningRows((prev) =>
+        prev.map((row) => {
+          if (row.id !== rowId) return row;
+          const nextMetadata = {
+            ...(row.metadata || {}),
+            qaLabel,
+            qaReviewedAt: new Date().toISOString(),
+          };
+          return { ...row, metadata: nextMetadata };
+        })
+      );
+    } catch (error) {
+      console.error('Failed to update QA label:', error);
+    } finally {
+      setQaUpdating((prev) => ({ ...prev, [rowId]: false }));
+    }
+  };
+
+  const escapeCsv = (value: unknown) => {
+    const s = String(value ?? '');
+    if (/[",\n]/.test(s)) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const exportLowConfidenceCsv = () => {
+    const lowRows = topLearningRows.filter(
+      (row) => typeof row.metadata?.intentConfidence === 'number' && row.metadata.intentConfidence < LOW_CONFIDENCE_THRESHOLD
+    );
+
+    if (lowRows.length === 0) return;
+
+    const header = [
+      'when',
+      'customer',
+      'intent',
+      'intent_confidence',
+      'tone',
+      'outcome',
+      'status',
+      'platform',
+      'intent_rule',
+      'user_message',
+      'ai_response',
+    ];
+
+    const lines = lowRows.map((row) => [
+      new Date(row.createdAt).toISOString(),
+      row.customer?.name || row.customer?.id || 'Unknown',
+      row.extractedIntent || 'unknown',
+      typeof row.metadata?.intentConfidence === 'number' ? Math.round(row.metadata.intentConfidence * 100) : '',
+      row.detectedEmotionalTone || 'neutral',
+      row.conversationOutcome || 'unknown',
+      row.wasSuccessful ? 'success' : 'fallback',
+      row.metadata?.platform || '',
+      row.metadata?.intentRule || '',
+      row.userMessage || '',
+      row.aiResponse || '',
+    ]);
+
+    const csv = [header, ...lines].map((cells) => cells.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    anchor.href = url;
+    anchor.download = `low-confidence-learning-${ts}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     async function loadStats() {
@@ -112,7 +262,8 @@ const WhatsAppTab = () => {
           sentimentByTopicData,
           extremeMessagesData,
           keywordTrendsData,
-          agentAIPerformanceData
+          agentAIPerformanceData,
+          recentLearningData,
         ] = await Promise.all([
           fetchTotalWhatsAppCustomers(),
           fetchTotalInboundWhatsAppMessages(),
@@ -126,6 +277,7 @@ const WhatsAppTab = () => {
           fetchWhatsAppMostExtremeMessages(),
           fetchWhatsAppKeywordTrends(),
           fetchWhatsAppAgentAIPerformance(),
+          fetchRecentConversationLearning(20),
         ]);
 
         setStats({
@@ -142,6 +294,9 @@ const WhatsAppTab = () => {
         setExtremeMessages(extremeMessagesData);
         setKeywordTrends(keywordTrendsData);
         setAgentAIPerformance(agentAIPerformanceData);
+        const learningPayload = (recentLearningData || {}) as ConversationLearningResponse;
+        setLearningRows(Array.isArray(learningPayload.items) ? learningPayload.items : []);
+        setLearningSource(learningPayload.source || null);
       } catch (error) {
         console.error("Error fetching analytics:", error);
       } finally {
@@ -571,6 +726,168 @@ const WhatsAppTab = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Row 6: Recent AI Learning */}
+      <Card className="border-none shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Bot className="w-3.5 h-3.5 text-muted-foreground" /> Recent AI Learning
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">
+                Low (&lt;{Math.round(LOW_CONFIDENCE_THRESHOLD * 100)}%): {lowConfidenceCount}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                Likely incorrect: {likelyIncorrectCount}
+              </Badge>
+              <button
+                type="button"
+                onClick={exportLowConfidenceCsv}
+                disabled={lowConfidenceCount === 0}
+                className="text-[11px] px-2 py-1 rounded-md border transition-colors bg-transparent text-muted-foreground border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Export low-confidence rows to CSV"
+              >
+                Export low confidence CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLowConfidenceOnly((prev) => !prev)}
+                className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${showLowConfidenceOnly
+                  ? 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400'
+                  : 'bg-transparent text-muted-foreground border-border hover:bg-muted'}`}
+              >
+                {showLowConfidenceOnly ? 'Showing low confidence' : 'Show low confidence only'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLikelyIncorrectOnly((prev) => !prev)}
+                className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${showLikelyIncorrectOnly
+                  ? 'bg-rose-500/10 text-rose-700 border-rose-500/30 dark:text-rose-400'
+                  : 'bg-transparent text-muted-foreground border-border hover:bg-muted'}`}
+              >
+                {showLikelyIncorrectOnly ? 'Showing likely incorrect' : 'Show likely incorrect only'}
+              </button>
+            </div>
+          </div>
+          {learningSource === 'derived_from_messages' && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400">
+              Showing derived rows from message history until live ConversationLearning rows accumulate.
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          {learningRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No conversation learning rows yet. Send a few AI-handled messages, then refresh this page.</p>
+          ) : visibleLearningRows.length === 0 && (showLowConfidenceOnly || showLikelyIncorrectOnly) ? (
+            <p className="text-sm text-muted-foreground">No rows match your current triage filters in the latest 20 conversations.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="text-[11px] text-muted-foreground uppercase bg-muted/50">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">When</th>
+                    <th className="px-3 py-2 font-medium">Customer</th>
+                    <th className="px-3 py-2 font-medium">Intent</th>
+                    <th className="px-3 py-2 font-medium">Conf</th>
+                    <th className="px-3 py-2 font-medium">Risk</th>
+                    <th className="px-3 py-2 font-medium">Tone</th>
+                    <th className="px-3 py-2 font-medium">Outcome</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">QA</th>
+                    <th className="px-3 py-2 font-medium">User Message</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {visibleLearningRows.map((row) => (
+                    <tr key={row.id} className="bg-card hover:bg-muted/50 transition-colors align-top">
+                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                        {new Date(row.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 text-foreground whitespace-nowrap">
+                        {row.customer?.name || row.customer?.id || 'Unknown'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Badge variant="outline" className="text-[10px]">
+                          {row.extractedIntent || 'unknown'}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <Badge
+                          variant="outline"
+                          className={
+                            confidenceLabel(row.metadata?.intentConfidence) === 'high'
+                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                              : confidenceLabel(row.metadata?.intentConfidence) === 'med'
+                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                          }
+                          title={typeof row.metadata?.intentConfidence === 'number' ? `rule: ${row.metadata?.intentRule || 'n/a'}` : 'n/a'}
+                        >
+                          {typeof row.metadata?.intentConfidence === 'number'
+                            ? `${Math.round(row.metadata.intentConfidence * 100)}%`
+                            : 'n/a'}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <Badge
+                          variant="outline"
+                          className={
+                            riskLabel(row.metadata?.likelyIncorrectScore) === 'high'
+                              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                              : riskLabel(row.metadata?.likelyIncorrectScore) === 'med'
+                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                          }
+                          title={Array.isArray(row.metadata?.likelyIncorrectReasons) ? row.metadata?.likelyIncorrectReasons.join(', ') : 'n/a'}
+                        >
+                          {typeof row.metadata?.likelyIncorrectScore === 'number'
+                            ? `${Math.round(row.metadata.likelyIncorrectScore * 100)}%`
+                            : 'n/a'}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                        {row.detectedEmotionalTone || 'neutral'}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                        {row.conversationOutcome || 'unknown'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <Badge
+                          variant="outline"
+                          className={row.wasSuccessful ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'}
+                        >
+                          {row.wasSuccessful ? 'success' : 'fallback'}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          {(['correct', 'partially_correct', 'incorrect', 'unsafe'] as const).map((label) => (
+                            <button
+                              key={label}
+                              type="button"
+                              disabled={qaUpdating[row.id] === true}
+                              onClick={() => setQaLabel(row.id, label)}
+                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${row.metadata?.qaLabel === label
+                                ? 'bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-400'
+                                : 'bg-transparent text-muted-foreground border-border hover:bg-muted'} disabled:opacity-60 disabled:cursor-not-allowed`}
+                            >
+                              {label === 'partially_correct' ? 'partial' : label}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground max-w-[360px] truncate" title={row.userMessage}>
+                        {row.userMessage}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div >
   );
 };

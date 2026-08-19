@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell, Calendar, DollarSign, RefreshCw, Check, CheckCheck, AlertCircle, Search, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,6 +8,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { API_BASE_URL } from '@/config';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { io, Socket } from 'socket.io-client';
 
 interface Notification {
     id: string;
@@ -43,6 +44,9 @@ export default function Notifications() {
     const [hasMore, setHasMore] = useState(true);
     const [activeTab, setActiveTab] = useState('all');
     const [loading, setLoading] = useState(true);
+    const socketRef = useRef<Socket | null>(null);
+    const isSocketConnectedRef = useRef(false);
+    const fetchNotificationsRef = useRef<(reset?: boolean) => Promise<void>>(async () => {});
 
     const fetchNotifications = async (reset = false) => {
         try {
@@ -87,12 +91,60 @@ export default function Notifications() {
         }
     };
 
+    fetchNotificationsRef.current = fetchNotifications;
+
     useEffect(() => {
         setPage(1);
         fetchNotifications(true);
-        const interval = setInterval(() => fetchNotifications(true), 30000);
-        return () => clearInterval(interval);
     }, [activeTab, search, filterRead]);
+
+    useEffect(() => {
+        socketRef.current = io(API_BASE_URL, {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+        });
+
+        socketRef.current.on('connect', () => {
+            isSocketConnectedRef.current = true;
+            socketRef.current?.emit('join', { platform: 'admin' });
+            void fetchNotificationsRef.current(true);
+        });
+
+        socketRef.current.on('disconnect', () => {
+            isSocketConnectedRef.current = false;
+        });
+
+        socketRef.current.on('newNotification', () => {
+            void fetchNotificationsRef.current(true);
+        });
+
+        socketRef.current.on('notificationCountUpdate', () => {
+            void fetchNotificationsRef.current(true);
+        });
+
+        // Fallback polling only when websocket is down and tab is visible.
+        const interval = setInterval(() => {
+            if (!isSocketConnectedRef.current && document.visibilityState === 'visible') {
+                void fetchNotificationsRef.current(true);
+            }
+        }, 120000);
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && !isSocketConnectedRef.current) {
+                void fetchNotificationsRef.current(true);
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            socketRef.current?.disconnect();
+            socketRef.current = null;
+        };
+    }, []);
 
     const loadMore = () => {
         setPage(prev => prev + 1);
