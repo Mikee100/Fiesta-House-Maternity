@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Calendar, DollarSign, RefreshCw, Check, CheckCheck, AlertCircle, Search, X } from 'lucide-react';
+import { Bell, Calendar, DollarSign, RefreshCw, Check, CheckCheck, AlertCircle, Search, X, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -9,10 +9,11 @@ import { API_BASE_URL } from '@/config';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { io, Socket } from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
 
 interface Notification {
     id: string;
-    type: 'booking' | 'reschedule' | 'payment' | 'reschedule_request' | 'ai_escalation';
+    type: string;
     title: string;
     message: string;
     metadata?: any;
@@ -37,6 +38,7 @@ const normalizeNotificationsData = (payload: any): NotificationsData => {
 };
 
 export default function Notifications() {
+    const navigate = useNavigate();
     const [data, setData] = useState<NotificationsData>( { notifications: [], total: 0, unreadCount: 0 });
     const [search, setSearch] = useState('');
     const [filterRead, setFilterRead] = useState<'all' | 'read' | 'unread'>('all');
@@ -263,6 +265,45 @@ export default function Notifications() {
         return format(new Date(date), 'MMM d, yyyy');
     };
 
+    const getNotificationTarget = (notification: Notification): { path: string; label: string } | null => {
+        const metadata = notification.metadata || {};
+
+        if (typeof metadata.targetPath === 'string' && metadata.targetPath.trim()) {
+            const path = metadata.targetPath.trim();
+            const label = path.startsWith('/customers/')
+                ? 'Open Customer'
+                : path === '/escalations'
+                    ? 'Open Escalations'
+                    : path.startsWith('/bookings')
+                        ? 'Open Bookings'
+                        : 'Open';
+            return { path, label };
+        }
+
+        if (metadata.customerId) {
+            return { path: `/customers/${metadata.customerId}`, label: 'Open Customer' };
+        }
+
+        if (notification.type === 'ai_escalation' || notification.type === 'escalation') {
+            return { path: '/escalations', label: 'Open Escalations' };
+        }
+
+        if (metadata.bookingId || notification.type === 'booking' || notification.type === 'reschedule' || notification.type === 'payment') {
+            return { path: '/bookings', label: 'Open Bookings' };
+        }
+
+        return null;
+    };
+
+    const handleOpenNotificationTarget = (notification: Notification) => {
+        const target = getNotificationTarget(notification);
+        if (!target) return;
+        if (!notification.read) {
+            void markAsRead(notification.id);
+        }
+        navigate(target.path);
+    };
+
     return (
         <div className="p-4 space-y-4 max-w-7xl mx-auto">
             {/* Compact Header */}
@@ -410,6 +451,7 @@ export default function Notifications() {
                                                     const displayMessage = shouldTruncate && !isExpanded
                                                         ? notification.message.slice(0, 100) + '...'
                                                         : notification.message;
+                                                    const target = getNotificationTarget(notification);
 
                                                     return (
                                                         <div
@@ -481,16 +523,32 @@ export default function Notifications() {
                                                                 </div>
 
                                                                 {/* Metadata */}
-                                                                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                                                                    <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
-                                                                    {notification.metadata?.customerName && (
-                                                                        <span className="truncate">• {notification.metadata.customerName}</span>
-                                                                    )}
-                                                                    {notification.metadata?.receipt && (
-                                                                        <span>• Receipt: {notification.metadata.receipt}</span>
-                                                                    )}
-                                                                    {notification.metadata?.bookingService && (
-                                                                        <span className="truncate">• {notification.metadata.bookingService}</span>
+                                                                <div className="flex items-center justify-between gap-3 text-[10px] text-muted-foreground">
+                                                                    <div className="flex items-center gap-3 min-w-0">
+                                                                        <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
+                                                                        {notification.metadata?.customerName && (
+                                                                            <span className="truncate">• {notification.metadata.customerName}</span>
+                                                                        )}
+                                                                        {notification.metadata?.receipt && (
+                                                                            <span>• Receipt: {notification.metadata.receipt}</span>
+                                                                        )}
+                                                                        {notification.metadata?.bookingService && (
+                                                                            <span className="truncate">• {notification.metadata.bookingService}</span>
+                                                                        )}
+                                                                    </div>
+                                                                    {target && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            className="h-6 px-2 text-[10px]"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleOpenNotificationTarget(notification);
+                                                                            }}
+                                                                        >
+                                                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                                                            {target.label}
+                                                                        </Button>
                                                                     )}
                                                                 </div>
                                                             </div>

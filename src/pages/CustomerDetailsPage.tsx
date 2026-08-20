@@ -118,6 +118,26 @@ const CustomerDetailsPage = () => {
   const lastMessage = messages?.[messages.length - 1];
   const pendingSessionNotesCount = sessionNotes?.filter((n) => n.status === 'pending').length || 0;
 
+  const inferredPlatform = useMemo(() => {
+    if (!customer) return 'other';
+    if (customer.platform) return customer.platform;
+    if (customer.whatsappId) return 'whatsapp';
+    if (customer.instagramId) return 'instagram';
+    if (customer.messengerId) return 'messenger';
+    if (customer.email?.endsWith('@whatsapp.local')) return 'whatsapp';
+    if (customer.email?.endsWith('@instagram.local')) return 'instagram';
+    if (customer.email?.endsWith('@messenger.local')) return 'messenger';
+    return 'other';
+  }, [customer]);
+
+  const displayPhone = useMemo(() => {
+    if (!customer) return 'Not provided';
+    if (customer.phone?.trim()) return customer.phone;
+    if (customer.whatsappId?.trim()) return customer.whatsappId;
+    if (inferredPlatform === 'whatsapp' && /^\+?\d{8,}$/.test(customer.id || '')) return customer.id;
+    return 'Not provided';
+  }, [customer, inferredPlatform]);
+
   const conversationTimeline = useMemo(() => {
     const list = [...(messages || [])].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -166,6 +186,7 @@ const CustomerDetailsPage = () => {
     if (type === 'external_people') return 'External People';
     if (type === 'external_items') return 'External Items';
     if (type === 'special_request') return 'Special Request';
+    if (type === 'action_request') return 'Action Request';
     return 'Other';
   };
 
@@ -173,9 +194,27 @@ const CustomerDetailsPage = () => {
     const itemsText = note.items?.length > 0 ? note.items.join(', ') : '';
     const detailsText = note.description?.trim() || '';
 
+    if (note.type === 'special_request' && detailsText.toLowerCase().startsWith('delivery preference:')) {
+      const methodMatch = detailsText.match(/delivery preference:\s*([^|]+)/i);
+      const emailMatch = detailsText.match(/email:\s*([^|]+)/i);
+      const whatsappMatch = detailsText.match(/whatsapp:\s*([^|]+)/i);
+
+      const method = methodMatch?.[1]?.trim()?.toLowerCase();
+      if (method === 'email') {
+        return `Request: Photo delivery via email${emailMatch?.[1] ? ` (${emailMatch[1].trim()})` : ''}`;
+      }
+      if (method === 'whatsapp') {
+        return `Request: Photo delivery via WhatsApp${whatsappMatch?.[1] ? ` (${whatsappMatch[1].trim()})` : ''}`;
+      }
+      if (method === 'download_link') {
+        return 'Request: Photo delivery via secure download link';
+      }
+    }
+
     if (note.type === 'external_people') return `People: ${itemsText || detailsText || 'No details provided'}`;
     if (note.type === 'external_items') return `Items: ${itemsText || detailsText || 'No details provided'}`;
     if (note.type === 'special_request') return `Request: ${detailsText || itemsText || 'No details provided'}`;
+    if (note.type === 'action_request') return `Action: ${detailsText || itemsText || 'No details provided'}`;
     return `Note: ${detailsText || itemsText || 'No details provided'}`;
   };
 
@@ -215,17 +254,17 @@ const CustomerDetailsPage = () => {
                 {customer.name ? customer.name.charAt(0).toUpperCase() : '?'}
               </div>
               <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
-                {customer.platform === 'whatsapp' && (
+                {inferredPlatform === 'whatsapp' && (
                   <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
                     <i className="fab fa-whatsapp text-white text-xs" />
                   </div>
                 )}
-                {customer.platform === 'instagram' && (
+                {inferredPlatform === 'instagram' && (
                   <div className="w-5 h-5 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
                     <i className="fab fa-instagram text-white text-xs" />
                   </div>
                 )}
-                {customer.platform === 'messenger' && (
+                {inferredPlatform === 'messenger' && (
                   <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                     <i className="fab fa-facebook-messenger text-white text-xs" />
                   </div>
@@ -304,7 +343,7 @@ const CustomerDetailsPage = () => {
                   <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div className="space-y-0.5">
                     <p className="text-xs text-muted-foreground">Phone</p>
-                    <p className="text-sm font-medium">{customer.phone || 'Not provided'}</p>
+                    <p className="text-sm font-medium">{displayPhone}</p>
                   </div>
                 </div>
 
@@ -321,7 +360,7 @@ const CustomerDetailsPage = () => {
                   <div className="space-y-0.5">
                     <p className="text-xs text-muted-foreground">Platform</p>
                     <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium capitalize">{customer.platform}</p>
+                      <p className="text-sm font-medium capitalize">{inferredPlatform === 'other' ? 'Unknown' : inferredPlatform}</p>
                     </div>
                   </div>
                 </div>
@@ -607,7 +646,7 @@ const CustomerDetailsPage = () => {
                     Session Notes & Preferences
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Items and people customer mentioned bringing to their session
+                    Operations review queue: approve actionable customer preferences and requests before shoot execution.
                   </CardDescription>
                 </CardHeader>
                 <Separator />
@@ -697,12 +736,12 @@ const CustomerDetailsPage = () => {
                                 <p className="text-sm font-medium mb-1">
                                   {getNoteSummary(note)}
                                 </p>
-                                {note.description && (
+                                {note.description && note.type !== 'special_request' && (
                                   <p className="text-xs text-muted-foreground mb-2">
                                     {note.description}
                                   </p>
                                 )}
-                                {note.sourceMessage && (
+                                {note.sourceMessage && note.sourceMessage.trim() !== (note.description || '').trim() && (
                                   <p className="text-xs text-muted-foreground italic mb-2">
                                     "{note.sourceMessage}"
                                   </p>

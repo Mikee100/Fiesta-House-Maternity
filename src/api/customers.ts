@@ -5,7 +5,10 @@ export interface Customer {
     name: string | null;
     phone: string | null;
     email: string | null;
-    platform: string;
+  platform?: string | null;
+  whatsappId?: string | null;
+  instagramId?: string | null;
+  messengerId?: string | null;
     createdAt: string;
     updatedAt: string;
     lastActivityAt?: string;
@@ -85,7 +88,7 @@ export const getCustomerPhotoLinks = async (customerId: string): Promise<PhotoLi
 export interface SessionNote {
   id: string;
   customerId: string;
-  type: 'external_people' | 'external_items' | 'special_request' | 'other';
+  type: 'external_people' | 'external_items' | 'special_request' | 'action_request' | 'other';
   items: string[];
   description: string | null;
   bookingId: string | null;
