@@ -1,6 +1,4 @@
-import { useApi } from '@/hooks/useApi';
-
-const api = useApi();
+import api from './apiInstance';
 
 export interface AIResponse {
   id: string;
