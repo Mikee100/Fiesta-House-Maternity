@@ -1,6 +1,4 @@
-import { useApi } from '@/hooks/useApi';
-
-const api = useApi();
+import api from './apiInstance';
 
 // Poll booking/payment status for a customerId
 export const pollBookingStatus = async (customerId: string): Promise<{ status: 'pending' | 'confirmed' | 'none', booking?: any }> => {
@@ -49,6 +47,17 @@ export interface Booking {
   service: string;
   dateTime: string;
   status: 'provisional' | 'confirmed' | 'cancelled';
+  payments?: Payment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Payment {
+  id: string;
+  amount: number;
+  status: 'pending' | 'success' | 'failed';
+  mpesaReceipt: string | null;
+  checkoutRequestId: string | null;
   createdAt: string;
   updatedAt: string;
 }
