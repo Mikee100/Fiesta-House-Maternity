@@ -9,9 +9,9 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 5000,
     proxy: {
-      // Proxy API requests to backend (NestJS on port 4000)
+      // Proxy API requests to backend (NestJS on port 4500)
       '/api': {
-        target: 'http://localhost:4000',
+        target: 'http://localhost:4500',
         changeOrigin: true,
       },
     },

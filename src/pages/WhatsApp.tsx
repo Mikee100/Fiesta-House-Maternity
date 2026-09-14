@@ -160,7 +160,6 @@ export default function WhatsApp() {
     if (autoScroll) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-    // eslint-disable-next-line
   }, [messages, selectedCustomerId]);
 
   // Handler for scroll events in chat

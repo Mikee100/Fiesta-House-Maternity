@@ -267,8 +267,8 @@ export default function Bookings() {
     const pad = (n: number) => n.toString().padStart(2, '0');
     const dateStr = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}`;
     getAvailableHours(dateStr, selectedService)
-      .then(hours => setAvailableHours(Array.isArray(hours) && hours.length > 0 ? hours : generateFallbackHours(selectedDate)))
-      .catch(() => setAvailableHours(generateFallbackHours(selectedDate)));
+      .then(hours => setAvailableHours(Array.isArray(hours) ? hours : []))
+      .catch(() => setAvailableHours([]));
   }, [selectedDate, selectedService]);
 
   useEffect(() => {
@@ -281,7 +281,7 @@ export default function Bookings() {
     const dateStr = `${rescheduleDate.getFullYear()}-${pad(rescheduleDate.getMonth() + 1)}-${pad(rescheduleDate.getDate())}`;
     getAvailableHours(dateStr, rescheduleService)
       .then(hours => setRescheduleAvailableHours(Array.isArray(hours) ? hours : []))
-      .catch(() => setRescheduleAvailableHours(generateFallbackHours(rescheduleDate)))
+      .catch(() => setRescheduleAvailableHours([]))
       .finally(() => setLoadingRescheduleHours(false));
   }, [rescheduleDate, rescheduleService, editDialogOpen]);
 

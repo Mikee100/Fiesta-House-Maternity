@@ -16,6 +16,7 @@ import {
   X,
   AlertTriangle,
   Activity,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ const navigation = [
   { name: 'Bookings', href: '/bookings', icon: Calendar },
   { name: 'Customers', href: '/customers', icon: Users },
   { name: 'WhatsApp', href: '/whatsapp', icon: Phone },
+  { name: 'Message Templates', href: '/whatsapp/templates', icon: FileText },
   { name: 'Messenger', href: '/messenger', icon: MessageSquare },
   { name: 'Instagram', href: '/instagram', icon: Instagram },
   { name: 'Packages', href: '/packages', icon: Package },

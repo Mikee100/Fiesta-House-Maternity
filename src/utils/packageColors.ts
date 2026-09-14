@@ -2,13 +2,29 @@
 // Each package gets a unique, visually distinct color
 
 export const PACKAGE_COLORS: Record<string, string> = {
-    'Standard Package': '#10B981',    // Green
-    'Economy Package': '#3B82F6',     // Blue
-    'Executive Package': '#8B5CF6',   // Purple
-    'Gold Package': '#F59E0B',        // Amber/Gold
-    'Platinum Package': '#6B7280',    // Gray/Platinum
-    'VIP Package': '#EF4444',         // Red
-    'VVIP Package': '#EC4899',        // Pink
+    'THE BLOOM': '#10B981',    // Green
+    'THE MUSE': '#3B82F6',     // Blue
+    'THE ICON': '#8B5CF6',     // Purple
+    'THE LEGEND': '#F59E0B',   // Gold
+    'THE QUEEN': '#EC4899',    // Pink
+    'THE EMPRESS': '#EF4444',   // Red/Burgundy (Signature/Most Loved)
+    'THE GODDESS': '#6366F1',   // Indigo/Royal Flagship
+    // Title Case variations
+    'The Bloom': '#10B981',
+    'The Muse': '#3B82F6',
+    'The Icon': '#8B5CF6',
+    'The Legend': '#F59E0B',
+    'The Queen': '#EC4899',
+    'The Empress': '#EF4444',
+    'The Goddess': '#6366F1',
+    // Legacy fallbacks
+    'Standard Package': '#10B981',
+    'Economy Package': '#3B82F6',
+    'Executive Package': '#8B5CF6',
+    'Gold Package': '#F59E0B',
+    'Platinum Package': '#6B7280',
+    'VIP Package': '#EF4444',
+    'VVIP Package': '#EC4899',
 };
 
 /**

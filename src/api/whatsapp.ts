@@ -8,7 +8,7 @@ let apiClient: AxiosInstance;
 const createApiClient = (): AxiosInstance => {
   const client = axios.create({
     baseURL: `${API_BASE_URL}/api`,
-    timeout: 10000,
+    timeout: 15000,
   });
 
   // Request interceptor to add auth token
@@ -39,6 +39,8 @@ const createApiClient = (): AxiosInstance => {
 };
 
 const api = createApiClient();
+
+// ─── Existing Types ──────────────────────────────────────────────────────────
 
 export interface WhatsAppSettings {
   apiKey?: string;
@@ -71,6 +73,54 @@ export interface WhatsAppConversation {
   aiEnabled: boolean;
 }
 
+// ─── Template Management Types ───────────────────────────────────────────────
+
+export interface WhatsAppAccountInfo {
+  connected: boolean;
+  wabaId: string;
+  phoneNumberId: string;
+  name?: string;
+  currency?: string;
+  timezone?: string;
+  error?: string;
+}
+
+export interface TemplateComponent {
+  type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
+  format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  text?: string;
+}
+
+export type TemplateStatus =
+  | 'APPROVED'
+  | 'PENDING'
+  | 'REJECTED'
+  | 'DISABLED'
+  | 'PAUSED'
+  | 'IN_APPEAL';
+
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  category: string;
+  language: string;
+  status: TemplateStatus;
+  components: TemplateComponent[];
+  quality_score?: { score: string };
+  rejected_reason?: string;
+  created_time?: string;
+}
+
+export interface CreateTemplatePayload {
+  name: string;
+  category: 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
+  language: string;
+  body: string;
+  examples: string[];
+}
+
+// ─── Existing API Functions ──────────────────────────────────────────────────
+
 export const getWhatsAppSettings = () => api.get('/whatsapp/settings');
 export const updateWhatsAppSettings = (settings: Partial<WhatsAppSettings>) =>
   api.post('/whatsapp/settings', settings);
@@ -85,3 +135,17 @@ export const toggleCustomerAi = async (id: string, enabled: boolean) => {
   return response.data;
 };
 export const getWhatsAppStats = () => api.get('/whatsapp/stats');
+
+// ─── Template Management API Functions ──────────────────────────────────────
+
+export const getWhatsAppAccountInfo = () =>
+  api.get<WhatsAppAccountInfo>('/whatsapp/account');
+
+export const getWhatsAppTemplates = () =>
+  api.get<{ templates: WhatsAppTemplate[] }>('/whatsapp/templates');
+
+export const createWhatsAppTemplate = (data: CreateTemplatePayload) =>
+  api.post<{ success: boolean; template: { id: string; status: string; category: string } }>(
+    '/whatsapp/templates',
+    data
+  );
