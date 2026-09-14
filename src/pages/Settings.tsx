@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,114 +10,90 @@ export default function Settings() {
   const { theme, toggleTheme } = useUIStore();
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="animate-fadeIn">
       <PageHeader
         title="Settings"
-        description="Manage your application preferences and configuration"
+        description="Manage preferences and configuration"
       />
 
-      <div className="grid gap-6">
-        <Card className="border-border/50 shadow-lg hover:shadow-xl transition-all">
-          <CardHeader className="border-b border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Palette className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Appearance</CardTitle>
-                <CardDescription>
-                  Customize how the dashboard looks
-                </CardDescription>
-              </div>
+      <div className="space-y-4 mt-6">
+        {/* Appearance Section */}
+        <div className="border border-border/30 rounded-md p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Palette className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Appearance</h3>
+          </div>
+          <div className="flex items-center justify-between pl-6">
+            <div>
+              <p className="text-xs font-medium">Dark Mode</p>
+              <p className="text-xs text-muted-foreground">Enable dark theme</p>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Dark Mode</Label>
-                <p className="text-sm text-muted-foreground">
-                  Enable dark mode theme
-                </p>
-              </div>
-              <Switch
-                checked={theme === 'dark'}
-                onCheckedChange={toggleTheme}
+            <Switch
+              checked={theme === 'dark'}
+              onCheckedChange={toggleTheme}
+              className="scale-90"
+            />
+          </div>
+        </div>
+
+        {/* Profile Section */}
+        <div className="border border-border/30 rounded-md p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <User className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Profile</h3>
+          </div>
+          <div className="space-y-3 pl-6">
+            <div>
+              <Label htmlFor="name" className="text-xs">Name</Label>
+              <Input 
+                id="name" 
+                placeholder="Your name" 
+                className="h-8 text-xs mt-1" 
               />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <Label htmlFor="email" className="text-xs">Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="your@email.com" 
+                className="h-8 text-xs mt-1" 
+              />
+            </div>
+            <Button size="sm" className="text-xs h-8">Save</Button>
+          </div>
+        </div>
 
-        <Card className="border-border/50 shadow-lg hover:shadow-xl transition-all">
-          <CardHeader className="border-b border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <User className="h-5 w-5 text-primary" />
-              </div>
+        {/* Notifications Section */}
+        <div className="border border-border/30 rounded-md p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Notifications</h3>
+          </div>
+          <div className="space-y-3 pl-6">
+            <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>
-                  Update your personal information
-                </CardDescription>
+                <p className="text-xs font-medium">New Bookings</p>
+                <p className="text-xs text-muted-foreground">Alert on new bookings</p>
               </div>
+              <Switch defaultChecked className="scale-90" />
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" placeholder="Your name" className="h-11" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="your@email.com" className="h-11" />
-            </div>
-            <Button className="shadow-md hover:shadow-lg transition-all">Save Changes</Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 shadow-lg hover:shadow-xl transition-all">
-          <CardHeader className="border-b border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Bell className="h-5 w-5 text-primary" />
-              </div>
+            <div className="flex items-center justify-between border-t border-border/20 pt-3">
               <div>
-                <CardTitle>Notifications</CardTitle>
-                <CardDescription>
-                  Configure notification preferences
-                </CardDescription>
+                <p className="text-xs font-medium">New Messages</p>
+                <p className="text-xs text-muted-foreground">Alert on new messages</p>
               </div>
+              <Switch defaultChecked className="scale-90" />
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>New Bookings</Label>
-                <p className="text-sm text-muted-foreground">
-                  Get notified when new bookings arrive
-                </p>
+            <div className="flex items-center justify-between border-t border-border/20 pt-3">
+              <div>
+                <p className="text-xs font-medium">System Updates</p>
+                <p className="text-xs text-muted-foreground">Alert on updates</p>
               </div>
-              <Switch defaultChecked />
+              <Switch className="scale-90" />
             </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>New Messages</Label>
-                <p className="text-sm text-muted-foreground">
-                  Get notified about new customer messages
-                </p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>System Updates</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications about system updates
-                </p>
-              </div>
-              <Switch />
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

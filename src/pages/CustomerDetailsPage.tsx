@@ -608,27 +608,58 @@ const CustomerDetailsPage = () => {
                       {bookings?.map((booking) => (
                         <div
                           key={booking.id}
-                          className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                          className="p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                         >
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium">{booking.service}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
-                              {format(new Date(booking.dateTime), 'MMM d, yyyy • h:mm a')}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">{booking.service}</p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Calendar className="h-3 w-3" />
+                                {format(new Date(booking.dateTime), 'MMM d, yyyy • h:mm a')}
+                              </div>
                             </div>
+                            <Badge
+                              variant={
+                                booking.status === 'confirmed'
+                                  ? 'default'
+                                  : booking.status === 'cancelled'
+                                    ? 'destructive'
+                                    : 'secondary'
+                              }
+                              className="text-xs font-normal"
+                            >
+                              {booking.status}
+                            </Badge>
                           </div>
-                          <Badge
-                            variant={
-                              booking.status === 'confirmed'
-                                ? 'default'
-                                : booking.status === 'cancelled'
-                                  ? 'destructive'
-                                  : 'secondary'
-                            }
-                            className="text-xs font-normal"
-                          >
-                            {booking.status}
-                          </Badge>
+
+                          <div className="mt-3 border-t pt-3 space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deposits & Payments</p>
+                            {booking.payments && booking.payments.length > 0 ? (
+                              <div className="space-y-2">
+                                {booking.payments.map((payment) => (
+                                  <div key={payment.id} className="rounded-md border border-border bg-background p-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-sm font-medium">KSh {payment.amount.toLocaleString()}</p>
+                                      <Badge
+                                        variant={payment.status === 'success' ? 'default' : payment.status === 'failed' ? 'destructive' : 'secondary'}
+                                        className="text-[10px]"
+                                      >
+                                        {payment.status}
+                                      </Badge>
+                                    </div>
+                                    <div className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+                                      <p>M-Pesa code: {payment.mpesaReceipt || 'Pending'}</p>
+                                      <p>Checkout ID: {payment.checkoutRequestId || 'N/A'}</p>
+                                      <p>Sent: {format(new Date(payment.createdAt), 'MMM d, yyyy • h:mm a')}</p>
+                                      <p>Updated: {format(new Date(payment.updatedAt), 'MMM d, yyyy • h:mm a')}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">No deposit record attached to this booking yet.</p>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -11,6 +11,7 @@ import Conversations from "./pages/Conversations";
 import Customers from "./pages/Customers";
 import CustomerDetailsPage from "./pages/CustomerDetailsPage";
 import WhatsApp from "./pages/WhatsApp";
+import WhatsAppTemplates from "./pages/WhatsAppTemplates";
 import Instagram from "./pages/Instagram";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import Settings from "./pages/Settings";
@@ -104,6 +105,16 @@ const AppRouter = () => {
               <ProtectedRoute>
                 <Layout>
                   <WhatsApp />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/whatsapp/templates"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <WhatsAppTemplates />
                 </Layout>
               </ProtectedRoute>
             }
