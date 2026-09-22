@@ -10,6 +10,8 @@ export interface KBEntry {
     answer: string;
     category: string;
     createdAt?: string;
+    updatedAt?: string;
+    mediaUrls?: string[];
 }
 
 export const knowledgeBaseApi = {
