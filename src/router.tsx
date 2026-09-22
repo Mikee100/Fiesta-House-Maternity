@@ -23,6 +23,7 @@ import Escalations from "./pages/Escalations";
 import Notifications from "./pages/Notifications";
 import MessengerPage from "./pages/MessengerPage";
 import SystemStatus from "./pages/SystemStatus";
+import RagInsights from "./pages/RagInsights";
 
 const queryClient = new QueryClient();
 
@@ -145,6 +146,16 @@ const AppRouter = () => {
               <ProtectedRoute>
                 <Layout>
                   <KnowledgeBase />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rag-insights"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <RagInsights />
                 </Layout>
               </ProtectedRoute>
             }

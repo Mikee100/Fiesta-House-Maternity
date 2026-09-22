@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Activity,
   FileText,
+  Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'Instagram', href: '/instagram', icon: Instagram },
   { name: 'Packages', href: '/packages', icon: Package },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
+  { name: 'RAG Insights', href: '/rag-insights', icon: Brain },
   { name: 'Escalations', href: '/escalations', icon: AlertTriangle },
   { name: 'System Status', href: '/system-status', icon: Activity },
   { name: 'Settings', href: '/settings', icon: Settings },
