@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { DataTable, Badge } from '@/components/DataTable';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,8 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import {
-  Search, Plus, Calendar as CalendarIcon, Clock, RefreshCw, CheckCircle, FileText, Send,
-  MoreVertical, Edit, History, X, Check, Info, CreditCard, Download, ExternalLink, ShieldCheck, Bell, MessageCircle
+  Search, Plus, Calendar as CalendarIcon, Clock, RefreshCw, CheckCircle, FileText, Send, List,
+  MoreVertical, Edit, History, X, Check, Info, CreditCard, Download, ExternalLink, ShieldCheck, Bell, MessageCircle, Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { listBookings, getServices, getAvailableHours, updateBookingDraft, getCalendarEvents, getBooking, updateBooking, Service, Package } from '@/api/bookings';
@@ -47,6 +47,8 @@ interface Booking {
   service: string;
   date: Date;
   time: string;
+  durationMinutes?: number;
+  recipientName?: string;
   status: 'provisional' | 'confirmed' | 'cancelled';
   googleEventId?: string;
 }
@@ -125,6 +127,9 @@ export default function Bookings() {
   const [bookingFollowups, setBookingFollowups] = useState<Followup[]>([]);
   const [bookingPayments, setBookingPayments] = useState<any[]>([]);
 
+  const bookingAddons: any[] = Array.isArray(fullBookingData?.bookingAddons) ? fullBookingData.bookingAddons : [];
+  const addonsTotal = bookingAddons.reduce((sum, addon) => sum + (addon.totalPrice || 0), 0);
+
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
@@ -138,7 +143,10 @@ export default function Bookings() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerHistory, setCustomerHistory] = useState<any>(null);
   const [loadingCustomerHistory, setLoadingCustomerHistory] = useState(false);
-  const [showCalendarPanel, setShowCalendarPanel] = useState(false);
+  const [showCalendarPanel, setShowCalendarPanel] = useState(true);
+  const [showAllBookings, setShowAllBookings] = useState(false);
+  const [timelineKey, setTimelineKey] = useState('');
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const getPackageById = (id: string) => packages.find(pkg => pkg.id === id);
 
@@ -160,6 +168,8 @@ export default function Bookings() {
           service: b.service,
           date: new Date(b.dateTime),
           time: new Date(b.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          durationMinutes: b.durationMinutes || undefined,
+          recipientName: b.recipientName || undefined,
           status: b.status,
           googleEventId: b.googleEventId,
         };
@@ -422,6 +432,7 @@ export default function Bookings() {
   const fetchBookingDetails = async (booking: Booking) => {
     setLoadingBookingDetails(true);
     setSelectedBookingDetails(booking);
+    setFullBookingData(null);
     setBookingDetailsOpen(true);
     try {
       const bookingData: any = await getBooking(booking.id);
@@ -563,6 +574,34 @@ export default function Bookings() {
   const bookingsForSelectedDate = selectedDate
     ? bookings.filter(b => b.date.toDateString() === selectedDate.toDateString())
     : [];
+
+  const timelineStartHour = 8;
+  const timelineEndHour = 20;
+  const timelineMinutes = (timelineEndHour - timelineStartHour) * 60;
+  const timelineRows = Array.from({ length: timelineEndHour - timelineStartHour + 1 }, (_, index) => timelineStartHour + index);
+  const getBookingDuration = (booking: Booking) => booking.durationMinutes || 120;
+  const selectedDayBookedMinutes = bookingsForSelectedDate.reduce((total, booking) => total + getBookingDuration(booking), 0);
+  const selectedDayConfirmed = bookingsForSelectedDate.filter((booking) => booking.status === 'confirmed').length;
+  const selectedDayOpenMinutes = Math.max(0, timelineMinutes - selectedDayBookedMinutes);
+
+  const getTimelinePosition = (booking: Booking) => {
+    const startMinutes = booking.date.getHours() * 60 + booking.date.getMinutes();
+    const topMinutes = Math.max(0, Math.min(timelineMinutes, startMinutes - timelineStartHour * 60));
+    const visibleDuration = Math.max(30, Math.min(getBookingDuration(booking), timelineMinutes - topMinutes));
+    return {
+      top: `${(topMinutes / timelineMinutes) * 100}%`,
+      height: `${(visibleDuration / timelineMinutes) * 100}%`,
+    };
+  };
+
+  const handleCalendarDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    if (!date) return;
+
+    const dateKey = date.toISOString().slice(0, 10);
+    setTimelineKey(dateKey);
+    window.setTimeout(() => timelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  };
 
   const bookingDateKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -726,7 +765,7 @@ export default function Bookings() {
         description="Manage appointments and schedules"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowCalendarPanel(v => !v)}>
+            <Button variant="outline" size="sm" onClick={() => { setShowCalendarPanel(v => !v); setShowAllBookings(false); }}>
               <CalendarIcon className="h-4 w-4 mr-2" />
               {showCalendarPanel ? 'Hide Calendar' : 'Show Calendar'}
             </Button>
@@ -787,53 +826,141 @@ export default function Bookings() {
         </CardContent>
       </Card>
 
-      <div className={`grid gap-6 ${showCalendarPanel ? 'lg:grid-cols-3' : 'grid-cols-1'}`}>
+      <div className="space-y-4">
         {showCalendarPanel && (
-          <Card className="border-border/50 lg:col-span-1">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">Calendar</CardTitle>
+          <Card className="border-border/50">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
+              <div>
+                <CardTitle className="text-base font-medium">Studio schedule</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Select a day to review the session flow and available capacity.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => handleCalendarDateSelect(new Date())}>Today</Button>
+                <Button variant="outline" size="sm" onClick={() => setShowAllBookings(true)}>
+                  <List className="mr-2 h-4 w-4" />
+                  All bookings
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="flex flex-col items-center gap-4">
-              <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border" dayContent={renderBookingDayContent} />
-              <div className="w-full space-y-2">
-                <p className="text-sm font-medium text-foreground">
-                  {selectedDate ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Select a date'}
-                </p>
-                {bookingsForSelectedDate.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No bookings for this date</p>
-                ) : (
-                  <div className="space-y-2 max-h-[240px] overflow-y-auto">
-                    {bookingsForSelectedDate.map(booking => (
-                      <div key={booking.id} className="flex items-center gap-2 p-2 rounded-md border border-border/50 text-sm">
-                        <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: getPackageColor(booking.service) }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{booking.customerName}</p>
-                          <p className="text-xs text-muted-foreground">{booking.time} - {booking.service}</p>
-                        </div>
-                        <Badge variant={getStatusVariant(booking.status)} className="capitalize text-[10px]">{booking.status}</Badge>
-                      </div>
-                    ))}
+            <CardContent className="flex flex-col items-stretch gap-4">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={handleCalendarDateSelect}
+                className="w-full rounded-md border"
+                classNames={{
+                  months: 'w-full',
+                  month: 'w-full space-y-5',
+                  head_row: 'flex w-full',
+                  head_cell: 'flex-1 w-auto text-muted-foreground rounded-md font-normal text-[0.9rem]',
+                  row: 'flex w-full mt-2',
+                  cell: 'flex-1 w-auto h-12 text-center text-sm p-0 relative',
+                  day: 'h-12 w-full p-0 font-normal aria-selected:opacity-100 text-sm',
+                  table: 'w-full border-collapse space-y-1',
+                }}
+                dayContent={renderBookingDayContent}
+              />
+              <div className="w-full">
+
+                <div ref={timelineRef} key={timelineKey} className="scroll-mt-6 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="mb-3 flex items-end justify-between border-b border-border/60 pb-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-primary">Daily schedule</p>
+                      <p className="text-lg font-semibold text-foreground">{selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{bookingsForSelectedDate.length} session{bookingsForSelectedDate.length === 1 ? '' : 's'} · {timelineStartHour}:00 - {timelineEndHour}:00</span>
                   </div>
-                )}
+                  <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-md border border-border/60 bg-background px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sessions</p>
+                      <p className="mt-1 text-lg font-semibold text-foreground">{bookingsForSelectedDate.length}</p>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Confirmed</p>
+                      <p className="mt-1 text-lg font-semibold text-foreground">{selectedDayConfirmed}</p>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Booked time</p>
+                      <p className="mt-1 text-lg font-semibold text-foreground">{Math.floor(selectedDayBookedMinutes / 60)}h {selectedDayBookedMinutes % 60 ? `${selectedDayBookedMinutes % 60}m` : ''}</p>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Open capacity</p>
+                      <p className="mt-1 text-lg font-semibold text-foreground">{Math.floor(selectedDayOpenMinutes / 60)}h {selectedDayOpenMinutes % 60 ? `${selectedDayOpenMinutes % 60}m` : ''}</p>
+                    </div>
+                  </div>
+                  <div className="relative h-[480px] overflow-y-auto rounded-md border border-border/60 bg-muted/20">
+                    <div className="relative min-h-[480px]" style={{ height: `${(timelineMinutes / 30) * 36}px` }}>
+                      {timelineRows.map((hour) => (
+                        <div
+                          key={hour}
+                          className="absolute left-0 right-0 border-t border-border/50"
+                          style={{ top: `${(((hour - timelineStartHour) * 60) / timelineMinutes) * 100}%` }}
+                        >
+                          <span className="absolute -top-2 left-2 bg-muted/20 px-1 text-[10px] text-muted-foreground">
+                            {new Date(2000, 0, 1, hour).toLocaleTimeString([], { hour: 'numeric' })}
+                          </span>
+                        </div>
+                      ))}
+                      {bookingsForSelectedDate.map((booking) => {
+                        const position = getTimelinePosition(booking);
+                        return (
+                          <button
+                            type="button"
+                            key={`timeline-${booking.id}`}
+                            className="absolute left-16 right-3 overflow-hidden rounded-md border bg-primary/10 px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-px hover:bg-primary/20 hover:shadow-md"
+                            style={{ ...position, borderLeftColor: getPackageColor(booking.service), borderLeftWidth: '4px' }}
+                            onClick={() => fetchBookingDetails(booking)}
+                            title={`Open ${booking.service} booking`}
+                          >
+                            <span className="block truncate text-xs font-semibold text-foreground">{booking.time} · {booking.service}</span>
+                            <span className="block truncate text-[11px] text-muted-foreground">
+                              {booking.recipientName && booking.recipientName !== booking.customerName ? `${booking.recipientName} · ` : ''}{booking.customerName}
+                            </span>
+                            <span className="block text-[10px] capitalize text-muted-foreground">{getBookingDuration(booking)} min · {booking.status}</span>
+                          </button>
+                        );
+                      })}
+                      {bookingsForSelectedDate.length === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center pl-16 text-center">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">No sessions scheduled</p>
+                            <p className="mt-1 text-xs text-muted-foreground">This day is open for new bookings.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Table */}
-        <Card className={`border-border/50 overflow-hidden ${showCalendarPanel ? 'lg:col-span-2' : 'col-span-1'}`}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center justify-between">
-              All Bookings
-              <span className="text-sm font-normal text-muted-foreground">{filteredBookings.length} found</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <DataTable data={filteredBookings} columns={columns} onRowClick={(booking) => fetchBookingDetails(booking)} />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Keep the full table available without competing with the calendar. */}
+        {(!showCalendarPanel || showAllBookings) ? (
+          <Card className="border-border/50 overflow-hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center justify-between">
+                All Bookings
+                <span className="text-sm font-normal text-muted-foreground">{filteredBookings.length} found</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <DataTable data={filteredBookings} columns={columns} onRowClick={(booking) => fetchBookingDetails(booking)} />
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Button
+            variant="outline"
+            className="w-full justify-between bg-background"
+            onClick={() => setShowAllBookings(true)}
+          >
+            <span>Show All Bookings</span>
+            <span className="text-xs text-muted-foreground">{filteredBookings.length} found</span>
+          </Button>
+        )}
       </div>
 
       {/* Payment Pending Modal */}
@@ -975,6 +1102,31 @@ export default function Bookings() {
                   </CardContent>
                 </Card>
               )}
+
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center justify-between"><span className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> Add-ons</span><Badge variant="outline">{bookingAddons.length}</Badge></CardTitle></CardHeader>
+                <CardContent>
+                  {bookingAddons.length === 0 ? <p className="text-sm text-muted-foreground text-center py-3">No add-ons requested</p> : (
+                    <div className="space-y-1.5">
+                      {bookingAddons.map((addon: any) => (
+                        <div key={addon.id} className="flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-md border border-border text-sm">
+                          <span className="truncate">{addon.name}{addon.quantity > 1 ? ` \u00d7${addon.quantity}` : ''}</span>
+                          <span className="flex items-center gap-2 shrink-0">
+                            <Badge variant={addon.status === 'pending' ? 'secondary' : 'default'} className="capitalize">{addon.status}</Badge>
+                            <span className="font-medium tabular-nums">{addon.totalPrice > 0 ? `KSh ${addon.totalPrice.toLocaleString()}` : 'Quoted'}</span>
+                          </span>
+                        </div>
+                      ))}
+                      {addonsTotal > 0 && (
+                        <div className="flex items-center justify-between px-2.5 pt-1.5 text-sm font-semibold">
+                          <span>Add-ons total</span>
+                          <span className="tabular-nums">KSh {addonsTotal.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center justify-between"><span className="flex items-center gap-2"><Bell className="h-4 w-4" /> Reminders</span><Badge variant="outline">{bookingReminders.length}</Badge></CardTitle></CardHeader>
