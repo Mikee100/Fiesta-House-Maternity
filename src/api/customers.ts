@@ -89,6 +89,9 @@ export interface SessionNote {
   id: string;
   customerId: string;
   type: 'external_people' | 'external_items' | 'special_request' | 'action_request' | 'other';
+  category: 'client_wish' | 'operational' | 'addon' | 'accessibility' | 'companion' | 'styling' | 'delivery' | 'other';
+  priority: 'normal' | 'high' | 'urgent';
+  actionStatus: 'open' | 'acknowledged' | 'ready' | 'completed';
   items: string[];
   description: string | null;
   bookingId: string | null;
@@ -113,7 +116,7 @@ export const getCustomerSessionNotes = async (customerId: string): Promise<Sessi
   return response.data;
 };
 
-export const updateSessionNote = async (noteId: string, data: { status?: string; adminNotes?: string; reviewedBy?: string }): Promise<SessionNote> => {
+export const updateSessionNote = async (noteId: string, data: { status?: string; adminNotes?: string; reviewedBy?: string; category?: string; priority?: string; actionStatus?: string }): Promise<SessionNote> => {
   const response = await api.patch(`/customers/session-notes/${noteId}`, data);
   return response.data;
 };

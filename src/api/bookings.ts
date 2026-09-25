@@ -35,6 +35,18 @@ export const getPackages = async (): Promise<Package[]> => {
   return Array.isArray(response.data) ? response.data : [];
 };
 
+export interface BookingAddon {
+  id: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'invoiced';
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface Booking {
   id: string;
   customerId: string;
@@ -48,6 +60,7 @@ export interface Booking {
   dateTime: string;
   status: 'provisional' | 'confirmed' | 'cancelled';
   payments?: Payment[];
+  bookingAddons?: BookingAddon[];
   createdAt: string;
   updatedAt: string;
 }

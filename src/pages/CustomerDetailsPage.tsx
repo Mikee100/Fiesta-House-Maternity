@@ -176,6 +176,9 @@ const CustomerDetailsPage = () => {
       : list.filter((note) => note.status === sessionNoteFilter);
 
     return [...filtered].sort((a, b) => {
+      const priorityRank = { urgent: 0, high: 1, normal: 2 };
+      const priorityDifference = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2);
+      if (priorityDifference !== 0) return priorityDifference;
       if (a.status === 'pending' && b.status !== 'pending') return -1;
       if (a.status !== 'pending' && b.status === 'pending') return 1;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -188,6 +191,20 @@ const CustomerDetailsPage = () => {
     if (type === 'special_request') return 'Special Request';
     if (type === 'action_request') return 'Action Request';
     return 'Other';
+  };
+
+  const getNoteCategoryLabel = (category: SessionNote['category']) => {
+    const labels: Record<SessionNote['category'], string> = {
+      client_wish: 'Client wish',
+      operational: 'Operations',
+      addon: 'Add-on',
+      accessibility: 'Accessibility',
+      companion: 'Companion',
+      styling: 'Styling',
+      delivery: 'Delivery',
+      other: 'Other',
+    };
+    return labels[category] || 'Client wish';
   };
 
   const getNoteSummary = (note: SessionNote) => {
@@ -761,6 +778,18 @@ const CustomerDetailsPage = () => {
                                     {note.booking.service}
                                   </Badge>
                                 )}
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${note.priority === 'urgent' ? 'border-red-300 bg-red-50 text-red-700' : note.priority === 'high' ? 'border-amber-300 bg-amber-50 text-amber-700' : ''}`}
+                                >
+                                  {note.priority === 'normal' ? 'Normal priority' : `${note.priority} priority`}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {getNoteCategoryLabel(note.category)}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {note.actionStatus}
+                                </Badge>
                               </div>
                               
                               <div>
@@ -813,6 +842,7 @@ const CustomerDetailsPage = () => {
                                     try {
                                       await updateSessionNote(note.id, {
                                         status: 'approved',
+                                        actionStatus: 'ready',
                                         reviewedBy: user?.name || user?.email || 'admin',
                                       });
                                       toast.success('Session note approved');
@@ -995,6 +1025,7 @@ const CustomerDetailsPage = () => {
                 try {
                   await updateSessionNote(reviewingNoteId, {
                     status: noteAction === 'approve' ? 'approved' : 'reviewed',
+                    actionStatus: noteAction === 'approve' ? 'ready' : 'acknowledged',
                     adminNotes: reviewNotesText || undefined,
                     reviewedBy: user?.name || user?.email || 'admin',
                   });
