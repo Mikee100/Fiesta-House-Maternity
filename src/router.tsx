@@ -24,6 +24,7 @@ import Notifications from "./pages/Notifications";
 import MessengerPage from "./pages/MessengerPage";
 import SystemStatus from "./pages/SystemStatus";
 import RagInsights from "./pages/RagInsights";
+import AiInstructions from "./pages/AiInstructions";
 
 const queryClient = new QueryClient();
 
@@ -156,6 +157,16 @@ const AppRouter = () => {
               <ProtectedRoute>
                 <Layout>
                   <RagInsights />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-instructions"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AiInstructions />
                 </Layout>
               </ProtectedRoute>
             }
