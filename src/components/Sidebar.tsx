@@ -18,6 +18,7 @@ import {
   Activity,
   FileText,
   Brain,
+  ListChecks,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ const navigation = [
   { name: 'Packages', href: '/packages', icon: Package },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
   { name: 'RAG Insights', href: '/rag-insights', icon: Brain },
+  { name: 'AI Instructions', href: '/ai-instructions', icon: ListChecks },
   { name: 'Escalations', href: '/escalations', icon: AlertTriangle },
   { name: 'System Status', href: '/system-status', icon: Activity },
   { name: 'Settings', href: '/settings', icon: Settings },
