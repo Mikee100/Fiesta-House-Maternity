@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './apiInstance';
 
 import { API_BASE_URL as API_BASE } from '../config';
 
@@ -31,26 +31,26 @@ export interface Invoice {
 
 export const invoicesApi = {
     generateInvoice: async (bookingId: string): Promise<Invoice> => {
-        const { data } = await axios.post(`${API_BASE}/api/invoices/generate/${bookingId}`);
+        const { data } = await api.post(`${API_BASE}/api/invoices/generate/${bookingId}`);
         return data;
     },
 
     sendInvoice: async (invoiceId: string): Promise<void> => {
-        await axios.post(`${API_BASE}/api/invoices/send/${invoiceId}`);
+        await api.post(`${API_BASE}/api/invoices/send/${invoiceId}`);
     },
 
     getInvoicesByBooking: async (bookingId: string): Promise<Invoice[]> => {
-        const { data } = await axios.get(`${API_BASE}/api/invoices/booking/${bookingId}`);
+        const { data } = await api.get(`${API_BASE}/api/invoices/booking/${bookingId}`);
         return data;
     },
 
     getInvoicesByCustomer: async (customerId: string): Promise<Invoice[]> => {
-        const { data } = await axios.get(`${API_BASE}/api/invoices/customer/${customerId}`);
+        const { data } = await api.get(`${API_BASE}/api/invoices/customer/${customerId}`);
         return data;
     },
 
     getAllInvoices: async (): Promise<Invoice[]> => {
-        const { data } = await axios.get(`${API_BASE}/api/invoices`);
+        const { data } = await api.get(`${API_BASE}/api/invoices`);
         return data;
     },
 

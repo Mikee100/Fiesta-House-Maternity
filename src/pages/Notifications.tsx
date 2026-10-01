@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, format } from 'date-fns';
 import { API_BASE_URL } from '@/config';
+import { apiFetch } from '@/api/apiFetch';
+import { useAuthStore } from '@/state/authStore';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { io, Socket } from 'socket.io-client';
@@ -67,7 +69,7 @@ export default function Notifications() {
             }
 
             const baseUrl = API_BASE_URL;
-            const response = await fetch(`${baseUrl}/api/notifications?${params}`);
+            const response = await apiFetch(`${baseUrl}/api/notifications?${params}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -103,6 +105,7 @@ export default function Notifications() {
     useEffect(() => {
         socketRef.current = io(API_BASE_URL, {
             transports: ['websocket', 'polling'],
+            auth: { token: useAuthStore.getState().token },
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: 5,
@@ -161,7 +164,7 @@ export default function Notifications() {
     const markAsRead = async (id: string) => {
         try {
             const baseUrl = API_BASE_URL;
-            await fetch(`${baseUrl}/api/notifications/${id}/read`, {
+            await apiFetch(`${baseUrl}/api/notifications/${id}/read`, {
                 method: 'PATCH',
             });
             fetchNotifications(true);
@@ -173,7 +176,7 @@ export default function Notifications() {
     const markAllAsRead = async () => {
         try {
             const baseUrl = API_BASE_URL;
-            await fetch(`${baseUrl}/api/notifications/mark-all-read`, {
+            await apiFetch(`${baseUrl}/api/notifications/mark-all-read`, {
                 method: 'PATCH',
             });
             fetchNotifications(true);
