@@ -29,7 +29,7 @@ import { followupsApi, Followup } from '@/api/followups';
 import { remindersApi, Reminder } from '@/api/reminders';
 import { getCustomer } from '@/api/customers';
 import { getCustomerBookings } from '@/api/bookings';
-import axios from 'axios';
+import api from '@/api/apiInstance';
 import { API_BASE_URL as API_BASE } from '@/config';
 import { apiFetch } from '@/api/apiFetch';
 import { useAuth } from '@/hooks/useAuth';
@@ -195,7 +195,7 @@ export default function Bookings() {
 
   const fetchPackages = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/bookings/packages`);
+      const res = await api.get(`${API_BASE}/api/bookings/packages`);
       const pkgs = Array.isArray(res.data) ? res.data : [];
       setPackages(pkgs);
       if (pkgs.length > 0) {
@@ -229,8 +229,8 @@ export default function Bookings() {
   const fetchStatistics = async () => {
     try {
       const [statusCounts, revenue] = await Promise.all([
-        axios.get(`${API_BASE}/api/analytics/booking-status-counts`).catch(() => ({ data: {} })),
-        axios.get(`${API_BASE}/api/analytics/revenue`).catch(() => ({ data: { total: 0 } })),
+        api.get(`${API_BASE}/api/analytics/booking-status-counts`).catch(() => ({ data: {} })),
+        api.get(`${API_BASE}/api/analytics/revenue`).catch(() => ({ data: { total: 0 } })),
       ]);
       setStatistics({
         total: bookings.length,
@@ -299,7 +299,7 @@ export default function Bookings() {
   const handleSyncCalendar = async () => {
     setSyncing(true);
     try {
-      await axios.post(`${API_BASE}/api/calendar/sync`);
+      await api.post(`${API_BASE}/api/calendar/sync`);
       toast({ title: 'Calendar Synced', description: 'All confirmed bookings have been synced to Google Calendar' });
       fetchBookings();
     } catch {
@@ -443,7 +443,7 @@ export default function Bookings() {
         setBookingPayments(Array.isArray(bookingData.payments) ? bookingData.payments : []);
       } else {
         try {
-          const payments = await axios.get(`${API_BASE}/api/payments`, { params: { bookingId: booking.id } });
+          const payments = await api.get(`${API_BASE}/api/payments`, { params: { bookingId: booking.id } });
           setBookingPayments(Array.isArray(payments.data) ? payments.data : []);
         } catch { setBookingPayments([]); }
       }
@@ -489,7 +489,7 @@ export default function Bookings() {
 
       let totalSpent = 0;
       try {
-        const paymentsRes = await axios.get(`${API_BASE}/api/payments`, { params: { customerId } });
+          const paymentsRes = await api.get(`${API_BASE}/api/payments`, { params: { customerId } });
         const payments = Array.isArray(paymentsRes.data) ? paymentsRes.data : [];
         totalSpent = payments.filter((p: any) => p.status === 'success').reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
       } catch (err) { console.error('Failed to fetch payments:', err); }
@@ -555,7 +555,7 @@ export default function Bookings() {
 
   const handleQuickAction = async (bookingId: string, action: 'confirm' | 'cancel') => {
     try {
-      await axios.post(`${API_BASE}/api/bookings/${bookingId}/${action}`);
+      await api.post(`${API_BASE}/api/bookings/${bookingId}/${action}`);
       toast({ title: action === 'confirm' ? 'Booking confirmed' : 'Booking cancelled' });
       fetchBookings();
     } catch {

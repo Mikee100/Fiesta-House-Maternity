@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './apiInstance';
 
 import { API_BASE_URL as API_URL } from '../config';
 
@@ -74,22 +74,22 @@ export interface YearOverYearGrowth {
 
 export const businessAnalyticsApi = {
     async getBusinessKPIs(): Promise<BusinessKPIs> {
-        const response = await axios.get(`${API_URL}/api/analytics/business-kpis`);
+        const response = await api.get(`${API_URL}/api/analytics/business-kpis`);
         return response.data;
     },
 
     async getRevenue() {
-        const response = await axios.get(`${API_URL}/api/analytics/revenue`);
+        const response = await api.get(`${API_URL}/api/analytics/revenue`);
         return response.data;
     },
 
     async getRevenueByPackage(): Promise<RevenueByPackage[]> {
-        const response = await axios.get(`${API_URL}/api/analytics/revenue-by-package`);
+        const response = await api.get(`${API_URL}/api/analytics/revenue-by-package`);
         return response.data;
     },
 
     async getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
-        const response = await axios.get(`${API_URL}/api/analytics/monthly-revenue`);
+        const response = await api.get(`${API_URL}/api/analytics/monthly-revenue`);
         return response.data;
     },
 

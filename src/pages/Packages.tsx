@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '@/api/apiInstance';
 import { API_BASE_URL as API_BASE } from '@/config';
 import { Plus, Pencil, Trash2, Camera, Clock3, Images, Shirt, Sparkles, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -92,7 +92,7 @@ export default function PackagesPage() {
   const fetchPackages = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE}/api/bookings/packages`);
+      const res = await api.get(`${API_BASE}/api/bookings/packages`);
       const data = Array.isArray(res.data) ? res.data : [];
       data.sort((a: Package, b: Package) => a.price - b.price);
       setPackages(data);
@@ -113,7 +113,7 @@ export default function PackagesPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await axios.delete(`${API_BASE}/api/bookings/packages/${deleteTarget.id}`);
+    await api.delete(`${API_BASE}/api/bookings/packages/${deleteTarget.id}`);
     setDeleteTarget(null);
     fetchPackages();
   };
@@ -146,9 +146,9 @@ export default function PackagesPage() {
       outfits: editing.outfits ? Number(editing.outfits) : 0,
     };
     if (isNew) {
-      await axios.post(`${API_BASE}/api/bookings/packages`, payload);
+      await api.post(`${API_BASE}/api/bookings/packages`, payload);
     } else {
-      await axios.put(`${API_BASE}/api/bookings/packages/${editing.id}`, payload);
+      await api.put(`${API_BASE}/api/bookings/packages/${editing.id}`, payload);
     }
     setEditing(null);
     fetchPackages();
