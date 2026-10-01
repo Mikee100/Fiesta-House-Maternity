@@ -31,6 +31,7 @@ import { getCustomer } from '@/api/customers';
 import { getCustomerBookings } from '@/api/bookings';
 import axios from 'axios';
 import { API_BASE_URL as API_BASE } from '@/config';
+import { apiFetch } from '@/api/apiFetch';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -357,7 +358,7 @@ export default function Bookings() {
       });
 
       if (paymentMethod === 'pod') {
-        const response = await fetch(`${API_BASE}/api/bookings/complete-pod/${user.id}`, { method: 'POST' });
+        const response = await apiFetch(`${API_BASE}/api/bookings/complete-pod/${user.id}`, { method: 'POST' });
         if (!response.ok) throw new Error('Failed to confirm Pay on Delivery booking');
         setIsDialogOpen(false);
         fetchBookings();
@@ -366,7 +367,7 @@ export default function Bookings() {
         return;
       }
 
-      const result = await fetch(`${API_BASE}/api/bookings/complete-draft/${user.id}`, {
+      const result = await apiFetch(`${API_BASE}/api/bookings/complete-draft/${user.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

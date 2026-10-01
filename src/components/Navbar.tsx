@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { API_BASE_URL } from '@/config';
+import { apiFetch } from '@/api/apiFetch';
 import { io, Socket } from 'socket.io-client';
 import { toast } from '@/components/ui/sonner';
 
@@ -34,7 +35,7 @@ export function Navbar() {
     const fetchUnreadCount = async () => {
       try {
         const baseUrl = API_BASE_URL;
-        const response = await fetch(`${baseUrl}/api/notifications/unread-count`);
+        const response = await apiFetch(`${baseUrl}/api/notifications/unread-count`);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -55,6 +56,7 @@ export function Navbar() {
     // Initialize WebSocket connection for real-time notification updates
     socketRef.current = io(API_BASE_URL, {
       transports: ['websocket', 'polling'],
+      auth: { token: useAuthStore.getState().token },
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { API_BASE_URL as API_BASE } from '@/config';
-import { Plus, Pencil, Trash2, Camera } from 'lucide-react';
+import { Plus, Pencil, Trash2, Camera, Clock3, Images, Shirt, Sparkles, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -15,14 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { getPackageColor } from '@/utils/packageColors';
 
 interface Package {
   id: string;
@@ -78,15 +71,15 @@ const emptyPackage: Partial<Package> = {
   notes: '',
 };
 
-function inclusionSummary(pkg: Package): string {
+function inclusionItems(pkg: Package): string[] {
   const items: string[] = [];
-  if (pkg.makeup) items.push('Makeup');
-  if (pkg.styling) items.push('Styling');
-  if (pkg.photobook) items.push('Photobook');
-  if (pkg.mount) items.push('Mount');
-  if (pkg.balloonBackdrop) items.push('Balloon backdrop');
-  if (pkg.wig) items.push('Wig');
-  return items.length > 0 ? items.join(', ') : '—';
+  if (pkg.makeup) items.push('Professional makeup');
+  if (pkg.styling) items.push('Outfit styling');
+  if (pkg.photobook) items.push(`Photobook${pkg.photobookSize ? ` · ${pkg.photobookSize}` : ''}`);
+  if (pkg.mount) items.push('Fine-art mount');
+  if (pkg.balloonBackdrop) items.push('Balloon + flower backdrop');
+  if (pkg.wig) items.push('Styled wig');
+  return items;
 }
 
 export default function PackagesPage() {
@@ -180,43 +173,60 @@ export default function PackagesPage() {
           <p className="text-sm text-muted-foreground mt-1">Add your first package to get started.</p>
         </div>
       ) : (
-        <div className="border border-border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Package</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Deposit</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Includes</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {packages.map(pkg => (
-                <TableRow key={pkg.id}>
-                  <TableCell>
-                    <div className="font-medium text-foreground">{pkg.name}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 capitalize">{pkg.type || 'unspecified'} · {pkg.images} images</div>
-                  </TableCell>
-                  <TableCell className="text-foreground">KSH {pkg.price.toLocaleString()}</TableCell>
-                  <TableCell className="text-muted-foreground">KSH {pkg.deposit.toLocaleString()}</TableCell>
-                  <TableCell className="text-muted-foreground">{pkg.duration}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-xs truncate">{inclusionSummary(pkg)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(pkg)}>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {packages.map(pkg => {
+            const color = getPackageColor(pkg.name);
+            const inclusions = inclusionItems(pkg);
+            return (
+              <article key={pkg.id} className="relative overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+                <div className="h-1.5" style={{ backgroundColor: color }} />
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color }}>{pkg.type || 'Studio edition'}</p>
+                      <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{pkg.name}</h2>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${pkg.name}`} onClick={() => handleEdit(pkg)}>
                         <Pencil size={14} />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(pkg)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" aria-label={`Delete ${pkg.name}`} onClick={() => setDeleteTarget(pkg)}>
                         <Trash2 size={14} />
                       </Button>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+
+                  <div className="mt-5 flex items-end justify-between border-b border-border pb-4">
+                    <div>
+                      <p className="text-2xl font-semibold tracking-tight text-foreground">KSH {pkg.price.toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Deposit KSH {pkg.deposit.toLocaleString()}</p>
+                    </div>
+                    <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ color, backgroundColor: `${color}18` }}>
+                      {pkg.name.toLowerCase().includes('goddess') ? 'Flagship' : 'Edition'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 py-4 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground"><Clock3 size={15} style={{ color }} /><span><strong className="font-medium text-foreground">{pkg.duration || '—'}</strong><br /><span className="text-xs">studio time</span></span></div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Images size={15} style={{ color }} /><span><strong className="font-medium text-foreground">{pkg.images}</strong><br /><span className="text-xs">edited photos</span></span></div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Shirt size={15} style={{ color }} /><span><strong className="font-medium text-foreground">{pkg.outfits}</strong><br /><span className="text-xs">outfits</span></span></div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Sparkles size={15} style={{ color }} /><span><strong className="font-medium text-foreground">{pkg.wig ? 'Included' : '—'}</strong><br /><span className="text-xs">styled wig</span></span></div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-border pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Included in this edition</p>
+                    {inclusions.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {inclusions.map(item => <span key={item} className="rounded-md bg-muted px-2 py-1 text-xs text-foreground">{item}</span>)}
+                      </div>
+                    ) : <p className="text-sm text-muted-foreground">Core studio session</p>}
+                  </div>
+
+                  {(pkg.photobook || pkg.mount) && <div className="mt-4 flex gap-3 text-xs text-muted-foreground"><BookOpen size={14} /><span>{pkg.photobook ? `Photobook${pkg.photobookSize ? ` ${pkg.photobookSize}` : ''}` : ''}{pkg.photobook && pkg.mount ? ' · ' : ''}{pkg.mount ? 'Fine-art mount' : ''}</span></div>}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 

@@ -29,6 +29,8 @@ interface Escalation {
 }
 
 import { API_BASE_URL } from '@/config';
+import { apiFetch } from '@/api/apiFetch';
+import { useAuthStore } from '@/state/authStore';
 
 export default function Escalations() {
     const [escalations, setEscalations] = useState<Escalation[]>([]);
@@ -38,7 +40,7 @@ export default function Escalations() {
 
     const fetchEscalations = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/escalations`);
+            const res = await apiFetch(`${API_BASE_URL}/api/escalations`);
             if (!res.ok) throw new Error('Failed to fetch escalations');
             const data = await res.json();
             setEscalations(data);
@@ -75,6 +77,7 @@ export default function Escalations() {
         // Initialize WebSocket connection
         socketRef.current = io(API_BASE_URL, {
             transports: ['websocket', 'polling'],
+            auth: { token: useAuthStore.getState().token },
         });
 
         socketRef.current.on('connect', () => {
@@ -130,7 +133,7 @@ export default function Escalations() {
 
     const handleResolve = async (id: string) => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/escalations/${id}/resolve`, {
+            const res = await apiFetch(`${API_BASE_URL}/api/escalations/${id}/resolve`, {
                 method: 'POST',
             });
             if (!res.ok) throw new Error('Failed to resolve');
