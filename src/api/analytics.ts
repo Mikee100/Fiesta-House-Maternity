@@ -3,8 +3,40 @@ export const fetchWhatsAppAgentAIPerformance = async () => {
   return res.data;
 };
 import axios from 'axios';
+import api from './apiInstance';
 
 import { API_BASE_URL as API_BASE } from '../config';
+
+export interface ModelUsage {
+  days: number;
+  allTimeTokens: number;
+  groqCooldownUntil: string | null;
+  customerUsage: { id: string; name: string; todayTokens: number; totalTokens: number }[];
+  summary: Record<'groq' | 'gemini', {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    calls: number;
+    failures: number;
+  }>;
+  daily: { date: string; groq: number; gemini: number }[];
+  recent: {
+    createdAt: string;
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    status: string;
+    failover: boolean;
+    errorCode: string | null;
+  }[];
+}
+
+export const fetchModelUsage = async (days: 7 | 30): Promise<ModelUsage> => {
+  const res = await api.get(`${API_BASE}/api/statistics/model-usage`, { params: { days } });
+  return res.data;
+};
 
 export const fetchWhatsAppSentimentAnalytics = async () => {
   const res = await axios.get(`${API_BASE}/api/analytics/whatsapp-sentiment`);
