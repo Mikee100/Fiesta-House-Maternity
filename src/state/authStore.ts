@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 interface User {
   id: string;
@@ -17,7 +18,7 @@ interface AuthState {
   setToken: (token: string) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>()(persist((set) => ({
   user: null,
   token: null,
   isAuthenticated: false,
@@ -37,4 +38,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   setUser: (user) => set({ user, isAuthenticated: true }),
   setToken: (token) => set({ token }),
+}), {
+  name: 'fiesta-admin-session',
+  storage: createJSONStorage(() => sessionStorage),
+  partialize: (state) => ({ user: state.user, token: state.token, isAuthenticated: state.isAuthenticated }),
 }));
