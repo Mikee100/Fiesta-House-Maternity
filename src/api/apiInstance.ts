@@ -20,6 +20,15 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Many modules call the default axios directly; only send the token to our own backend.
+axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = useAuthStore.getState().token;
+  if (token && config.url?.startsWith(API_BASE_URL) && !config.headers.has('Authorization')) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
+  return config;
+});
+
 // Response interceptor to handle token refresh or logout on 401
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
