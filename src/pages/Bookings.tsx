@@ -424,7 +424,7 @@ export default function Bookings() {
       booking.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.customerPhone?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' ? booking.status !== 'cancelled' : booking.status === statusFilter;
     const matchesPackage = packageFilter === 'all' || booking.service === packageFilter;
     const matchesDateRange = !dateRange.from || !dateRange.to || (booking.date >= dateRange.from && booking.date <= dateRange.to);
     return matchesSearch && matchesStatus && matchesPackage && matchesDateRange;
@@ -563,18 +563,22 @@ export default function Bookings() {
     }
   };
 
-  const getStatusVariant = (status: Booking['status']) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'default';
-      case 'provisional': return 'secondary';
-      case 'cancelled': return 'destructive';
-      default: return 'default';
+      case 'confirmed': return 'capitalize border-emerald-300 bg-emerald-50 text-emerald-700';
+      case 'provisional': return 'capitalize border-amber-300 bg-amber-50 text-amber-700';
+      case 'cancelled': return 'capitalize border-red-300 bg-red-50 text-red-700';
+      default: return 'capitalize';
     }
   };
 
-  const bookingsForSelectedDate = selectedDate
-    ? bookings.filter(b => b.date.toDateString() === selectedDate.toDateString())
+  const allBookingsForSelectedDate = selectedDate
+    ? bookings
+        .filter(b => b.date.toDateString() === selectedDate.toDateString())
+        .sort((a, b) => Number(a.status === 'cancelled') - Number(b.status === 'cancelled'))
     : [];
+  const bookingsForSelectedDate = allBookingsForSelectedDate.filter(b => b.status !== 'cancelled');
+  const cancelledForSelectedDate = allBookingsForSelectedDate.length - bookingsForSelectedDate.length;
 
   const timelineStartHour = 8;
   const timelineEndHour = 20;
@@ -604,21 +608,18 @@ export default function Bookings() {
     window.setTimeout(() => timelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   };
 
-  const bookingDateKeys = useMemo(() => {
-    const keys = new Set<string>();
-    bookings
-      .filter((b) => b.status !== 'cancelled')
-      .forEach((b) => {
-        const d = b.date;
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        keys.add(key);
-      });
-    return keys;
+  const { bookingDateKeys, cancelledDateKeys } = useMemo(() => {
+    const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const active = new Set<string>();
+    const cancelled = new Set<string>();
+    bookings.forEach((b) => (b.status === 'cancelled' ? cancelled : active).add(keyOf(b.date)));
+    return { bookingDateKeys: active, cancelledDateKeys: cancelled };
   }, [bookings]);
 
   const renderBookingDayContent = ({ date }: DayContentProps) => {
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const hasBookings = bookingDateKeys.has(key);
+    const onlyCancelled = !hasBookings && cancelledDateKeys.has(key);
 
     return (
       <div className="relative h-full w-full flex items-center justify-center">
@@ -627,6 +628,12 @@ export default function Bookings() {
           <span
             className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-primary"
             aria-hidden="true"
+          />
+        )}
+        {onlyCancelled && (
+          <span
+            className="absolute bottom-1 h-1.5 w-1.5 rounded-full border border-red-500"
+            title="Cancelled sessions only"
           />
         )}
       </div>
@@ -672,7 +679,7 @@ export default function Bookings() {
     {
       header: 'Status',
       accessor: (row: Booking) => (
-        <Badge variant={getStatusVariant(row.status)} className="capitalize">{row.status}</Badge>
+        <Badge variant="outline" className={getStatusClass(row.status)}>{row.status}</Badge>
       ),
     },
     {
@@ -869,7 +876,11 @@ export default function Bookings() {
                       <p className="text-xs font-medium uppercase tracking-wide text-primary">Daily schedule</p>
                       <p className="text-lg font-semibold text-foreground">{selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                     </div>
-                    <span className="text-xs text-muted-foreground">{bookingsForSelectedDate.length} session{bookingsForSelectedDate.length === 1 ? '' : 's'} · {timelineStartHour}:00 - {timelineEndHour}:00</span>
+                    <span className="text-xs text-muted-foreground">
+                      {bookingsForSelectedDate.length} active session{bookingsForSelectedDate.length === 1 ? '' : 's'}
+                      {cancelledForSelectedDate > 0 && <span className="text-red-600"> · {cancelledForSelectedDate} cancelled</span>}
+                      {' '}· {timelineStartHour}:00 - {timelineEndHour}:00
+                    </span>
                   </div>
                   <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div className="rounded-md border border-border/60 bg-background px-3 py-2">
@@ -902,26 +913,32 @@ export default function Bookings() {
                           </span>
                         </div>
                       ))}
-                      {bookingsForSelectedDate.map((booking) => {
+                      {allBookingsForSelectedDate.map((booking) => {
                         const position = getTimelinePosition(booking);
+                        const isCancelled = booking.status === 'cancelled';
                         return (
                           <button
                             type="button"
                             key={`timeline-${booking.id}`}
-                            className="absolute left-16 right-3 overflow-hidden rounded-md border bg-primary/10 px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-px hover:bg-primary/20 hover:shadow-md"
-                            style={{ ...position, borderLeftColor: getPackageColor(booking.service), borderLeftWidth: '4px' }}
+                            className={isCancelled
+                              ? 'absolute left-16 right-3 overflow-hidden rounded-md border border-dashed border-red-300 bg-red-50/70 px-2 py-1 text-left opacity-70 transition-opacity hover:opacity-100'
+                              : 'absolute left-16 right-3 overflow-hidden rounded-md border bg-primary/10 px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-px hover:bg-primary/20 hover:shadow-md'}
+                            style={{ ...position, borderLeftColor: isCancelled ? '#ef4444' : getPackageColor(booking.service), borderLeftWidth: '4px' }}
                             onClick={() => fetchBookingDetails(booking)}
-                            title={`Open ${booking.service} booking`}
+                            title={`Open ${booking.service} booking (${booking.status})`}
                           >
-                            <span className="block truncate text-xs font-semibold text-foreground">{booking.time} · {booking.service}</span>
-                            <span className="block truncate text-[11px] text-muted-foreground">
+                            <span className="flex items-center gap-2">
+                              <span className={`truncate text-xs font-semibold ${isCancelled ? 'text-red-700 line-through' : 'text-foreground'}`}>{booking.time} · {booking.service}</span>
+                              <span className={`shrink-0 rounded border px-1 text-[9px] font-semibold uppercase tracking-wide ${getStatusClass(booking.status)}`}>{booking.status}</span>
+                            </span>
+                            <span className={`block truncate text-[11px] text-muted-foreground ${isCancelled ? 'line-through' : ''}`}>
                               {booking.recipientName && booking.recipientName !== booking.customerName ? `${booking.recipientName} · ` : ''}{booking.customerName}
                             </span>
-                            <span className="block text-[10px] capitalize text-muted-foreground">{getBookingDuration(booking)} min · {booking.status}</span>
+                            <span className="block text-[10px] text-muted-foreground">{getBookingDuration(booking)} min</span>
                           </button>
                         );
                       })}
-                      {bookingsForSelectedDate.length === 0 && (
+                      {allBookingsForSelectedDate.length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center pl-16 text-center">
                           <div>
                             <p className="text-sm font-medium text-foreground">No sessions scheduled</p>
@@ -1081,7 +1098,7 @@ export default function Bookings() {
                   <div><Label className="text-muted-foreground text-xs">Customer</Label><p className="font-medium">{selectedBookingDetails.customerName}</p></div>
                   <div><Label className="text-muted-foreground text-xs">Phone</Label><p className="font-medium">{selectedBookingDetails.customerPhone || 'N/A'}</p></div>
                   <div><Label className="text-muted-foreground text-xs">Service</Label><p className="font-medium">{selectedBookingDetails.service}</p></div>
-                  <div><Label className="text-muted-foreground text-xs">Status</Label><Badge variant={getStatusVariant(selectedBookingDetails.status)} className="capitalize">{selectedBookingDetails.status}</Badge></div>
+                  <div><Label className="text-muted-foreground text-xs">Status</Label><Badge variant="outline" className={getStatusClass(selectedBookingDetails.status)}>{selectedBookingDetails.status}</Badge></div>
                   <div><Label className="text-muted-foreground text-xs">Date</Label><p className="font-medium">{selectedBookingDetails.date.toLocaleDateString()}</p></div>
                   <div><Label className="text-muted-foreground text-xs">Time</Label><p className="font-medium">{selectedBookingDetails.time}</p></div>
                 </CardContent>
@@ -1221,7 +1238,7 @@ export default function Bookings() {
                     Currently {editingBooking.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at {editingBooking.time}
                   </p>
                 </div>
-                <Badge variant={getStatusVariant(editingBooking.status)} className="capitalize">{editingBooking.status}</Badge>
+                <Badge variant="outline" className={getStatusClass(editingBooking.status)}>{editingBooking.status}</Badge>
               </div>
 
               <div className="grid gap-2">
@@ -1340,7 +1357,7 @@ export default function Bookings() {
                             <p className="font-medium text-sm">{booking.service}</p>
                             <p className="text-xs text-muted-foreground">{new Date(booking.dateTime).toLocaleDateString()} - {new Date(booking.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                           </div>
-                          <Badge variant={getStatusVariant(booking.status)} className="capitalize">{booking.status}</Badge>
+                          <Badge variant="outline" className={getStatusClass(booking.status)}>{booking.status}</Badge>
                         </div>
                       ))}
                     </div>
