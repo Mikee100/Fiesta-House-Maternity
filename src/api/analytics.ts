@@ -12,14 +12,14 @@ export interface ModelUsage {
   allTimeTokens: number;
   groqCooldownUntil: string | null;
   customerUsage: { id: string; name: string; todayTokens: number; totalTokens: number }[];
-  summary: Record<'groq' | 'gemini', {
+  summary: Record<'groq' | 'groq2' | 'gemini' | 'gemini2', {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
     calls: number;
     failures: number;
   }>;
-  daily: { date: string; groq: number; gemini: number }[];
+  daily: { date: string; groq: number; groq2: number; gemini: number; gemini2: number }[];
   recent: {
     createdAt: string;
     provider: string;

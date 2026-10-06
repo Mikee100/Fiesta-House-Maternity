@@ -12,7 +12,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar
 } from 'recharts';
 
-const MODEL_COLORS = { groq: '#0f766e', gemini: '#dc6b3f' };
+const MODEL_COLORS = { groq: '#0f766e', groq2: '#2563eb', gemini: '#dc6b3f', gemini2: '#b45309' };
 const formatTokens = (value: number) => new Intl.NumberFormat('en-KE').format(value);
 
 const OverviewTab = () => {
@@ -92,7 +92,8 @@ const OverviewTab = () => {
 
   const formatCurrency = (amount: number) => `KSH ${amount.toLocaleString()}`;
   const SENTIMENT_COLORS = ['#10b981', '#22c55e', '#94a3b8', '#f59e0b', '#ef4444'];
-  const groqTokensToday = modelUsage?.daily.find((day) => day.date === new Date().toISOString().slice(0, 10))?.groq || 0;
+  const todayUsage = modelUsage?.daily.find((day) => day.date === new Date().toISOString().slice(0, 10));
+  const groqTokensToday = (todayUsage?.groq || 0) + (todayUsage?.groq2 || 0);
   const groqCooldownActive = !!modelUsage?.groqCooldownUntil && new Date(modelUsage.groqCooldownUntil).getTime() > Date.now();
   const latestGroqCall = modelUsage?.recent.find((row) => row.provider === 'groq');
 
@@ -150,7 +151,7 @@ const OverviewTab = () => {
             <span className="text-xs text-muted-foreground">All-time tokens recorded across customers · older usage has no provider breakdown</span>
           </div>
         )}
-        {modelUsage && (modelUsage.summary.groq.calls > 0 || groqCooldownActive) && (
+        {modelUsage && (modelUsage.summary.groq.calls + modelUsage.summary.groq2.calls > 0 || groqCooldownActive) && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-border pb-5">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Groq · today UTC</h3>
@@ -160,14 +161,14 @@ const OverviewTab = () => {
               <p className={groqCooldownActive ? 'font-semibold text-amber-700 dark:text-amber-400' : 'font-medium text-foreground'}>
                 {groqCooldownActive ? 'Rate limited · cooldown active' : latestGroqCall?.errorCode === '429' ? 'Latest Groq attempt: 429' : 'No active Groq cooldown'}
               </p>
-              {groqCooldownActive && <p className="text-xs text-muted-foreground">Retry after {new Date(modelUsage.groqCooldownUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Gemini handles new turns</p>}
+              {groqCooldownActive && <p className="text-xs text-muted-foreground">Retry after {new Date(modelUsage.groqCooldownUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · configured fallbacks handle new turns</p>}
               <p className="mt-1 text-xs text-muted-foreground">Local usage does not show Groq’s actual remaining balance.</p>
             </div>
           </div>
         )}
         {!modelUsage ? (
           <p className="py-10 text-center text-sm text-muted-foreground">{usageLoading ? 'Loading model usage…' : 'No usage data available'}</p>
-        ) : modelUsage.summary.groq.calls + modelUsage.summary.gemini.calls === 0 ? (
+        ) : modelUsage.summary.groq.calls + modelUsage.summary.groq2.calls + modelUsage.summary.gemini.calls + modelUsage.summary.gemini2.calls === 0 ? (
           <div className="py-8 text-center">
             <p className="text-sm font-medium text-foreground">No Groq or Gemini calls recorded in this period</p>
             <p className="mt-1 text-xs text-muted-foreground">Provider breakdown starts with new AI responses.</p>
@@ -185,21 +186,23 @@ const OverviewTab = () => {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                     <XAxis dataKey="date" tickFormatter={(value: string) => value.slice(5)} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} interval={usageDays === 30 ? 4 : 0} />
                     <YAxis tickFormatter={(value: number) => value >= 1000 ? `${Math.round(value / 1000)}k` : String(value)} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                    <Tooltip formatter={(value: number, name: string) => [formatTokens(value), name === 'groq' ? 'Groq' : 'Gemini']} contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 12 }} />
+                    <Tooltip formatter={(value: number, name: string) => [formatTokens(value), name === 'groq' ? 'Groq primary' : name === 'groq2' ? 'Groq backup' : name === 'gemini' ? 'Gemini' : 'Gemini backup 2']} contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 12 }} />
                     <Bar dataKey="groq" stackId="usage" fill={MODEL_COLORS.groq} name="Groq" maxBarSize={32} />
+                    <Bar dataKey="groq2" stackId="usage" fill={MODEL_COLORS.groq2} name="Groq backup" maxBarSize={32} />
                     <Bar dataKey="gemini" stackId="usage" fill={MODEL_COLORS.gemini} name="Gemini" maxBarSize={32} />
+                    <Bar dataKey="gemini2" stackId="usage" fill={MODEL_COLORS.gemini2} name="Gemini backup 2" maxBarSize={32} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
             <div className="space-y-3">
-              {(['groq', 'gemini'] as const).map((provider) => {
+              {(['groq', 'groq2', 'gemini', 'gemini2'] as const).map((provider) => {
                 const row = modelUsage.summary[provider];
-                const total = modelUsage.summary.groq.totalTokens + modelUsage.summary.gemini.totalTokens;
+                const total = modelUsage.summary.groq.totalTokens + modelUsage.summary.groq2.totalTokens + modelUsage.summary.gemini.totalTokens + modelUsage.summary.gemini2.totalTokens;
                 return (
                   <div key={provider} className="border-b border-border pb-3 last:border-0">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="flex items-center gap-2 text-sm font-semibold"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: MODEL_COLORS[provider] }} />{provider === 'groq' ? 'Groq · Primary' : 'Gemini · Backup'}</span>
+                      <span className="flex items-center gap-2 text-sm font-semibold"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: MODEL_COLORS[provider] }} />{provider === 'groq' ? 'Groq · Primary' : provider === 'groq2' ? 'Groq · Backup' : provider === 'gemini' ? 'Gemini · Backup' : 'Gemini · Final fallback'}</span>
                       <span className="text-lg font-semibold tabular-nums">{formatTokens(row.totalTokens)}</span>
                     </div>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${total ? row.totalTokens / total * 100 : 0}%`, background: MODEL_COLORS[provider] }} /></div>
@@ -212,7 +215,7 @@ const OverviewTab = () => {
                 {modelUsage.recent.length === 0 ? <p className="text-xs text-muted-foreground">No model calls recorded yet.</p> :
                   <div className="space-y-1.5">{modelUsage.recent.slice(0, 4).map((row, index) => (
                     <div key={`${row.createdAt}-${index}`} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="truncate text-muted-foreground"><span className="font-medium text-foreground">{row.provider === 'gemini' ? 'Gemini' : 'Groq'}</span>{row.failover ? ' · failover' : ''}{row.status !== 'success' ? ` · error ${row.errorCode || ''}` : ''}</span>
+                      <span className="truncate text-muted-foreground"><span className="font-medium text-foreground">{row.provider === 'gemini2' ? 'Gemini backup 2' : row.provider === 'gemini' ? 'Gemini' : row.provider === 'groq2' ? 'Groq backup' : 'Groq primary'}</span>{row.failover ? ' · failover' : ''}{row.status !== 'success' ? ` · error ${row.errorCode || ''}` : ''}</span>
                       <span className="shrink-0 tabular-nums text-muted-foreground">{formatTokens(row.totalTokens)} · {new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   ))}</div>}
