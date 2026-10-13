@@ -15,6 +15,7 @@ import WhatsAppTemplates from "./pages/WhatsAppTemplates";
 import Instagram from "./pages/Instagram";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import Settings from "./pages/Settings";
+import InstagramIntegration from "./pages/InstagramIntegration";
 import PackagesPage from "./pages/Packages";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -177,6 +178,16 @@ const AppRouter = () => {
               <ProtectedRoute>
                 <Layout>
                   <Settings />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings/integrations/instagram"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <InstagramIntegration />
                 </Layout>
               </ProtectedRoute>
             }

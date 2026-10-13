@@ -14,6 +14,16 @@ import {
 
 const MODEL_COLORS = { groq: '#0f766e', groq2: '#2563eb', gemini: '#dc6b3f', gemini2: '#b45309' };
 const formatTokens = (value: number) => new Intl.NumberFormat('en-KE').format(value);
+const getUsageErrorMessage = (error: unknown): string => {
+  const response = (error as { response?: { status?: number; data?: { error?: unknown } } })?.response;
+  if (response?.status === 401) return 'Your session is missing or expired. Sign in again to view model usage.';
+  if (response?.status === 403) return 'Administrator access is required to view model usage.';
+  if (response) {
+    const detail = typeof response.data?.error === 'string' ? `: ${response.data.error}` : '';
+    return `Usage request failed (HTTP ${response.status ?? 'unknown'})${detail}`;
+  }
+  return 'Could not reach the backend. Check that it is running and reachable.';
+};
 
 const OverviewTab = () => {
   const [kpis, setKpis] = useState<any>(null);
@@ -25,21 +35,22 @@ const OverviewTab = () => {
   const [usageDays, setUsageDays] = useState<7 | 30>(7);
   const [modelUsage, setModelUsage] = useState<ModelUsage | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
-  const [usageError, setUsageError] = useState(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     const loadUsage = async () => {
       try {
         const data = await fetchModelUsage(usageDays);
-        if (active) { setModelUsage(data); setUsageError(false); }
-      } catch {
-        if (active) setUsageError(true);
+        if (active) { setModelUsage(data); setUsageError(null); }
+      } catch (error) {
+        if (active) setUsageError(getUsageErrorMessage(error));
       } finally {
         if (active) setUsageLoading(false);
       }
     };
     setUsageLoading(true);
+    setUsageError(null);
     void loadUsage();
     const refresh = window.setInterval(() => { void loadUsage(); }, 60_000);
     return () => { active = false; window.clearInterval(refresh); };
@@ -127,7 +138,7 @@ const OverviewTab = () => {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">AI model usage</h2>
-            <p className="text-xs text-muted-foreground">Recorded tokens across Groq and Gemini · updates every minute</p>
+            <p className="text-xs text-muted-foreground">Provider usage for the selected period · UTC · updates every minute</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="inline-flex rounded-md border border-border p-0.5" aria-label="Usage period">
@@ -138,17 +149,17 @@ const OverviewTab = () => {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => { setUsageLoading(true); void fetchModelUsage(usageDays).then((data) => { setModelUsage(data); setUsageError(false); }).catch(() => setUsageError(true)).finally(() => setUsageLoading(false)); }}
+            <button type="button" onClick={() => { setUsageLoading(true); setUsageError(null); void fetchModelUsage(usageDays).then((data) => { setModelUsage(data); setUsageError(null); }).catch((error) => setUsageError(getUsageErrorMessage(error))).finally(() => setUsageLoading(false)); }}
               aria-label="Refresh model usage" title="Refresh model usage" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
               <RefreshCw size={15} className={usageLoading ? 'animate-spin' : ''} />
             </button>
           </div>
         </div>
-        {usageError && <p className="mb-3 text-xs text-destructive">Model usage is unavailable right now.</p>}
+        {usageError && <p className="mb-3 text-xs text-destructive">{usageError}</p>}
         {modelUsage && (
           <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border pb-4">
             <span className="text-2xl font-semibold tabular-nums text-foreground">{formatTokens(modelUsage.allTimeTokens)}</span>
-            <span className="text-xs text-muted-foreground">All-time tokens recorded across customers · older usage has no provider breakdown</span>
+            <span className="text-xs text-muted-foreground">Lifetime customer counters · older usage has no provider attribution</span>
           </div>
         )}
         {modelUsage && (modelUsage.summary.groq.calls + modelUsage.summary.groq2.calls > 0 || groqCooldownActive) && (
@@ -159,7 +170,7 @@ const OverviewTab = () => {
             </div>
             <div className="text-sm">
               <p className={groqCooldownActive ? 'font-semibold text-amber-700 dark:text-amber-400' : 'font-medium text-foreground'}>
-                {groqCooldownActive ? 'Rate limited · cooldown active' : latestGroqCall?.errorCode === '429' ? 'Latest Groq attempt: 429' : 'No active Groq cooldown'}
+                {groqCooldownActive ? 'Rate limited · cooldown active' : latestGroqCall?.errorCode ? `Latest primary error: ${latestGroqCall.errorCode} · no active cooldown` : 'No active Groq cooldown'}
               </p>
               {groqCooldownActive && <p className="text-xs text-muted-foreground">Retry after {new Date(modelUsage.groqCooldownUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · configured fallbacks handle new turns</p>}
               <p className="mt-1 text-xs text-muted-foreground">Local usage does not show Groq’s actual remaining balance.</p>
@@ -167,7 +178,7 @@ const OverviewTab = () => {
           </div>
         )}
         {!modelUsage ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">{usageLoading ? 'Loading model usage…' : 'No usage data available'}</p>
+          usageLoading ? <p className="py-10 text-center text-sm text-muted-foreground">Loading model usage…</p> : !usageError && <p className="py-10 text-center text-sm text-muted-foreground">No usage data available</p>
         ) : modelUsage.summary.groq.calls + modelUsage.summary.groq2.calls + modelUsage.summary.gemini.calls + modelUsage.summary.gemini2.calls === 0 ? (
           <div className="py-8 text-center">
             <p className="text-sm font-medium text-foreground">No Groq or Gemini calls recorded in this period</p>
@@ -178,7 +189,7 @@ const OverviewTab = () => {
             <div className="min-w-0">
               <div className="mb-2 flex items-baseline justify-between">
                 <span className="text-xs font-medium text-muted-foreground">Daily tokens · UTC</span>
-                <span className="text-sm font-semibold tabular-nums">{formatTokens(modelUsage.summary.groq.totalTokens + modelUsage.summary.gemini.totalTokens)} total</span>
+                <span className="text-sm font-semibold tabular-nums">{formatTokens(modelUsage.summary.groq.totalTokens + modelUsage.summary.groq2.totalTokens + modelUsage.summary.gemini.totalTokens + modelUsage.summary.gemini2.totalTokens)} total</span>
               </div>
               <div className="h-[210px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -227,7 +238,7 @@ const OverviewTab = () => {
           <div className="mt-5 border-t border-border pt-4">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-sm font-semibold text-foreground">Customer token counters</h3>
-              <span className="text-xs text-muted-foreground">Top 20 by all-time usage · separate from provider totals</span>
+              <span className="text-xs text-muted-foreground">Top 20 by lifetime customer counters · not comparable to period provider totals</span>
             </div>
             {!modelUsage.customerUsage?.length ? (
               <p className="py-5 text-sm text-muted-foreground">No customer token usage recorded yet.</p>
@@ -237,7 +248,7 @@ const OverviewTab = () => {
                   <thead className="sticky top-0 bg-background text-xs text-muted-foreground">
                     <tr className="border-b border-border">
                       <th scope="col" className="py-2 pr-3 text-left font-medium">Customer</th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium">Server day</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">Today (server time)</th>
                       <th scope="col" className="px-3 py-2 text-right font-medium">All time</th>
                       <th scope="col" className="py-2 pl-3 text-right font-medium">Share</th>
                     </tr>
