@@ -1,10 +1,11 @@
+import { Link } from 'react-router-dom';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useUIStore } from '@/state/uiStore';
 import { PageHeader } from '@/components/PageHeader';
-import { Palette, User, Bell } from 'lucide-react';
+import { Palette, User, Bell, Instagram, ChevronRight } from 'lucide-react';
 
 export default function Settings() {
   const { theme, toggleTheme } = useUIStore();
@@ -17,6 +18,28 @@ export default function Settings() {
       />
 
       <div className="space-y-4 mt-6">
+        {/* Integrations Section */}
+        <div className="border border-border/30 rounded-md p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Instagram className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Integrations</h3>
+          </div>
+          <div className="pl-6">
+            <Link
+              to="/settings/integrations/instagram"
+              className="flex items-center justify-between rounded-md border border-border/20 px-3 py-2.5 hover:bg-accent/40 transition-colors"
+            >
+              <div>
+                <p className="text-xs font-medium">Instagram</p>
+                <p className="text-xs text-muted-foreground">
+                  Connect a professional account for customer DMs
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          </div>
+        </div>
+
         {/* Appearance Section */}
         <div className="border border-border/30 rounded-md p-4">
           <div className="flex items-center gap-2 mb-4">
