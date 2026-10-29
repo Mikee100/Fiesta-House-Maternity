@@ -33,8 +33,30 @@ export interface ModelUsage {
   }[];
 }
 
+export interface CustomerDailyTokenUsageResponse {
+  date: string;
+  totalTokens: number;
+  customerCount: number;
+  customers: {
+    id: string;
+    name: string;
+    totalTokens: number;
+  }[];
+}
+
 export const fetchModelUsage = async (days: 7 | 30): Promise<ModelUsage> => {
   const res = await api.get(`${API_BASE}/api/statistics/model-usage`, { params: { days } });
+  return res.data;
+};
+
+export const fetchCustomerDailyTokenUsage = async (
+  date: string,
+): Promise<CustomerDailyTokenUsageResponse> => {
+  const res = await api.get(
+    `${API_BASE}/api/statistics/customer-daily-token-usage`,
+    { params: { date } },
+  );
+
   return res.data;
 };
 
