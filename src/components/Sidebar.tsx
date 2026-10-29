@@ -30,6 +30,7 @@ const navigation = [
   { name: 'Customers', href: '/customers', icon: Users },
   { name: 'WhatsApp', href: '/whatsapp', icon: Phone },
   { name: 'Message Templates', href: '/whatsapp/templates', icon: FileText },
+  { name: 'AI Models', href: '/AIModelMonitoringPage', icon: FileText },
   { name: 'Messenger', href: '/messenger', icon: MessageSquare },
   { name: 'Instagram', href: '/instagram', icon: Instagram },
   { name: 'Packages', href: '/packages', icon: Package },

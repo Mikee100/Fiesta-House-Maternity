@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Bookings from "./pages/Bookings";
 import Conversations from "./pages/Conversations";
 import Customers from "./pages/Customers";
+import AIModelMonitoringPage from "./pages/AIModelMonitoringPage";
 import CustomerDetailsPage from "./pages/CustomerDetailsPage";
 import WhatsApp from "./pages/WhatsApp";
 import WhatsAppTemplates from "./pages/WhatsAppTemplates";
@@ -72,6 +73,19 @@ const AppRouter = () => {
               </ProtectedRoute>
             }
           />
+           <Route
+            path="/AIModelMonitoringPage"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AIModelMonitoringPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+
+          
           <Route
             path="/customers"
             element={
